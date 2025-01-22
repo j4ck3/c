@@ -1,0 +1,59 @@
+version: "3"
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - 6881:6881
+      - 6881:6881/udp
+      - 8080:8080 # qbittorrent
+      - 5030:5030 # slskd
+      - 5031:5031 # slskd
+      - 50300:50300 # slskd
+      
+    volumes:
+      - /mnt/user/appdata/gluetun:/gluetun
+    environment:
+      # See https://github.com/qdm12/gluetun-wiki/tree/main/setup#setup
+      - VPN_SERVICE_PROVIDER=custom
+      - VPN_TYPE=wireguard
+      - VPN_ENDPOINT_IP="185.125.168.248"
+      - VPN_ENDPOINT_PORT="1443"
+      - WIREGUARD_PUBLIC_KEY="4WHB9+UMCaiS/0pnsuX5AU22u0PgXp+QZzY7daigqxI="
+      - WIREGUARD_PRIVATE_KEY="eDykhbE+ksAR3iVoocwOK41Hv5WybWl5D/VU3sJKpkA="
+      - WIREGUARD_ADDRESSES="10.13.106.33/24"
+      
+      - TZ=Europe/Stockholm
+      - UPDATER_PERIOD=24h
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent
+    container_name: qBittorrent
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Stockholm
+      - WEBUI_PORT=8080
+    volumes:
+      - /mnt/user/appdata/qbittorrent:/config
+      - /mnt/user/downloads:/downloads
+    depends_on:
+      - gluetun
+    restart: always
+
+  services:
+      image: slskd/slskd
+      container_name: slskd
+      network_mode: "service:gluetun"
+      environment:
+        - SLSKD_REMOTE_CONFIGURATION=true
+      volumes:
+        - /mnt/user/appdata/slskd:/app
+      restart: always
+      depends_on:
+        - gluetun

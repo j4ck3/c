@@ -1,0 +1,20 @@
+version: '3'
+services:
+    macos:
+        container_name: 'macos'
+        image: 'docker-osx-vnc:latest'
+        privileged: true
+        devices:
+            - /dev/kvm
+        network_mode: 'host'
+        cap_add:
+            - ALL
+        ports:
+            - '5999:5999'
+            - '50922:10022'
+        environment:
+
+            - 'DISPLAY=${DISPLAY:-:0.0}'
+            - EXTRA='-display none -vnc 0.0.0.0:99,password=on'
+        volumes:
+            - /tmp/.X11-unix:/tmp/.X11-unix

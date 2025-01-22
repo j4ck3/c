@@ -1,0 +1,20 @@
+version: '2.1'
+services:
+  trilium:
+    image: zadam/trilium:latest
+    container_name: trilium
+    ports:
+      - "3737:8080"
+    environment:
+      - TRILIUM_DATA_DIR=/home/node/trilium-data
+    volumes:
+      - /mnt/user/trilium:/home/node/trilium-data
+    networks:
+      - docker0
+    labels:
+      - "net.unraid.docker.icon=https://cdn.lo4d.com/t/icon/128/trilium-notes.png"
+
+networks:
+  docker0:
+    name: docker0
+    external: true

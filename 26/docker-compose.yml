@@ -1,0 +1,30 @@
+version: "3.0"
+services:
+  ispy:
+    image: doitandbedone/ispyagentdvr
+    container_name: agentdvr
+    environment:
+      - TZ=Europe/Stockholm
+    volumes:
+      - /mnt/user/agentdvr/XML:/agent/Media/XML/
+      - /mnt/user/agentdvr/Media:/agent/Media/WebServerRoot/Media/
+      - /mnt/user/agentdvr/Commands:/agent/Commands/
+    labels:
+      - "net.unraid.docker.icon=https://ispycontent.azureedge.net/img/ispy2.webp"
+    ports:
+      - 8090:8090
+      - 3478:3478/udp
+      - 50000-50010:50000-50010/udp
+    restart: unless-stopped
+
+  CodeProjectAI:
+    image: codeproject/ai-server
+    labels:
+      - "net.unraid.docker.icon=https://www.codeproject.com/ai/docs/img/FavIcon.png"
+    container_name: codeproject-ai-server-cpu
+    hostname: codeproject-ai-server
+    ports:
+      - "32168:32168"
+    environment:
+      - TZ=Europe/Stockholm 
+    restart: unless-stopped
