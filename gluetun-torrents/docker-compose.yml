@@ -13,11 +13,11 @@ services:
       - 5030:5030 # slskd
       - 5031:5031 # slskd
       - 50300:50300 # slskd
-      
+      - 11470:11470 #stremio-server
     volumes:
       - /mnt/user/appdata/gluetun:/gluetun
     environment:
-      - VPN_SERVICE_PROVIDER=custom  # See https://github.com/qdm12/gluetun-wiki/tree/main/setup#setup
+      - VPN_SERVICE_PROVIDER=custom # See https://github.com/qdm12/gluetun-wiki/tree/main/setup#setup
       - VPN_TYPE=${VPN_TYPE}
       - VPN_ENDPOINT_IP=${VPN_ENDPOINT_IP}
       - VPN_ENDPOINT_PORT=${VPN_ENDPOINT_PORT}
@@ -26,6 +26,7 @@ services:
       - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
       - TZ=Europe/Stockholm
       - UPDATER_PERIOD=24h
+    restart: always
 
   qBittorrent:
     image: lscr.io/linuxserver/qbittorrent
@@ -54,3 +55,34 @@ services:
     restart: always
     depends_on:
       - gluetun
+
+  stremio-server:
+    image: stremio/server:latest
+    container_name: stremio-server
+    network_mode: "service:gluetun"
+    environment:
+      - STREMIO_USERNAME=${STREMIO_USERNAME}
+      - STREMIO_PASSWORD=${STREMIO_PASSWORD}
+      - FFMPEG_BIN=/bin/ffmpeg
+      - FFPROBE_BIN=/bin/ffprobe
+    volumes:
+      - /mnt/user/appdata/stremio-server:/stremio
+      - /bin/ffmpeg:/bin/ffmpeg:ro
+      - /bin/ffprobe:/bin/ffprobe:ro
+    depends_on:
+      - gluetun
+      - ffmpeg
+    restart: always
+
+  ffmpeg:
+    image: linuxserver/ffmpeg:latest
+    container_name: ffmpeg
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      - VAAPI_DEVICE=/dev/dri/renderD128
+    stdin_open: true
+    tty: true
+    volumes:
+      - /mnt/user/appdata/ffmpeg:/config
+    restart: always
