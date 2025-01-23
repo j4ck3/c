@@ -6,9 +6,9 @@ services:
     container_name: postgres
     restart: always
     environment:
-      POSTGRES_USER: jacke         # Replace with your desired username
-      POSTGRES_PASSWORD: 7073bd88-c450-4c67-9068-674dfcc6d74c # Replace with your desired password
-      POSTGRES_DB: postgres       # Replace with your desired database name
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
