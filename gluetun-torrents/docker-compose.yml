@@ -7,8 +7,7 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     ports:
-      - 6881:6881
-      - 6881:6881/udp
+      - 8888:8888/tcp # HTTP proxy
       - 8080:8080 # qbittorrent
       - 5030:5030 # slskd
       - 5031:5031 # slskd

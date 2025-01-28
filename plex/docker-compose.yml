@@ -3,6 +3,8 @@ services:
         container_name: plex
         image: lscr.io/linuxserver/plex:latest
         restart: unless-stopped
+        devices:
+            - /dev/dri:/dev/dri
         volumes:
             - /mnt/user/appdata/plex/config:/config
             - /mnt/user/appdata/plex/temp:/transcode
@@ -12,16 +14,10 @@ services:
             - /mnt/user/media/TV:/TV Shows
             - /mnt/user/media/Youtube:/Youtube
             - /dev/shm:/transcode # set transcode folder in plex settings to /transcode
-        ports:
-            - 32400:32400/tcp
         environment:
-            - PLEX_UID=1000  # Set Plex user to 'jacob' UID
-            - PLEX_GID=100   # Set Plex group to 'users' GID
             - PUID=1000
             - PGID=100
-            # - UMASK=022
             - TZ=Europe/Stockholm
-            - ADVERTISE_IP=https://plex.hjacke.com
-            - PLEX_CLAIM=claim-seBxm7jPLh-5oMxN9s4w # get this from plex.tv/claim
             - PLEX_PASS=yes
+            - PLEX_CLAIM=claim-hzqVrknZUEoSHTJvvxrx
         network_mode: host

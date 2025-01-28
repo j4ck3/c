@@ -10,22 +10,23 @@ services:
       - PLAYWRIGHT_DRIVER_URL=ws://playwright-chrome:3000
       # - BASE_URL=https://mysite.com # configure this for your own domain
     volumes:
-      - '/mnt/user/appdata/changedetection/data/datastore:/data'
+      - '/mnt/user/appdata/changedetection/data/datastore:/datastore'
+      - '/mnt/user/appdata/changedetection/config:/config'
     depends_on:
       playwright-chrome:
-        condition: service_started #tessst
+        condition: service_started
     restart: unless-stopped
 
   browser-chrome:
-     hostname: browser-chrome
-     image: selenium/standalone-chrome:125.0
-     shm_size: '2gb'
-     restart: unless-stopped
-     volumes:
-     # Workaround to avoid the browser crashing inside a docker container
-     # See https://github.com/SeleniumHQ/docker-selenium#quick-start
-     - /dev/shm:/dev/shm
-   
+    hostname: browser-chrome
+    image: selenium/standalone-chrome:125.0
+    shm_size: '3gb'
+    restart: unless-stopped
+    volumes:
+      # Workaround to avoid the browser crashing inside a docker container
+      # See https://github.com/SeleniumHQ/docker-selenium#quick-start
+      - /dev/shm:/dev/shm
+
   playwright-chrome:
     hostname: playwright-chrome
     image: browserless/chrome
