@@ -1,0 +1,20 @@
+services:
+  syncthing:
+    image: lscr.io/linuxserver/syncthing:latest
+    container_name: syncthing
+    hostname: syncthing
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Stockholm
+    volumes:
+      - /home/jacob/appdata/syncthing/config:/config
+      - /home/jacob/syncthing:/syncthing
+      - /home/jacob/backups/trilium:/trilium
+      - /home/jacob/backups/unraid-appdata:/unraid-appdata
+    ports:
+      - 8384:8384
+      - 22000:22000/tcp
+      - 22000:22000/udp
+      - 21027:21027/udp
