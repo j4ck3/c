@@ -1,0 +1,11 @@
+services:
+  dashy:
+    image: lissy93/dashy:latest
+    container_name: dashy
+    restart: unless-stopped
+    ports:
+      - "3333:80"
+    volumes:
+      - /mnt/user/appdata/dashy:/app/user-data
+    environment:
+      - NODE_ENV=production
