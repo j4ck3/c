@@ -1,0 +1,16 @@
+services:
+  navidrome:
+    image: deluan/navidrome
+    container_name: navidrome
+    restart: unless-stopped
+    ports:
+      - "4533:4533"
+    volumes:
+      - /mnt/user/music:/music
+      - /mnt/user/appdata/navidrome/data:/data
+    environment:
+      - ND_SCANSCHEDULE=1h
+      - ND_LOGLEVEL=info
+      - ND_MUSICFOLDER=/music:ro
+      # - ND_SESSIONTIMEOUT=24h  # Keep login sessions active for 24 hours
+      # - ND_BASEURL=/  # Set a base URL if using a reverse proxy

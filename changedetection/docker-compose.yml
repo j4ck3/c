@@ -20,7 +20,7 @@ services:
   browser-chrome:
     hostname: browser-chrome
     image: selenium/standalone-chrome:125.0
-    shm_size: '3gb'
+    shm_size: '5gb'
     restart: unless-stopped
     volumes:
       # Workaround to avoid the browser crashing inside a docker container
