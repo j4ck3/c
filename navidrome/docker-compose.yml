@@ -11,6 +11,6 @@ services:
     environment:
       - ND_SCANSCHEDULE=1h
       - ND_LOGLEVEL=info
-      - ND_MUSICFOLDER=/music:ro
+      - ND_MUSICFOLDER=/music
       # - ND_SESSIONTIMEOUT=24h  # Keep login sessions active for 24 hours
       # - ND_BASEURL=/  # Set a base URL if using a reverse proxy

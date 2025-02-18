@@ -1,9 +1,0 @@
-services:
-  musicbrainz-picard:
-    image: mikenye/picard:latest
-    container_name: musicbrainz-picard
-    ports:
-      - 4800:5800
-    volumes:
-      - /mnt/user/appdata/musicbrainz/config:/config:rw
-      - /mnt/user/music:/storage:rw

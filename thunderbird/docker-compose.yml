@@ -1,0 +1,8 @@
+services:
+  thunderbird:
+    container_name: thunderbird
+    image: jlesage/thunderbird
+    ports:
+      - "5900:5800"
+    volumes:
+      - "/mnt/user/appdata/thunderbird/config:/config:rw"

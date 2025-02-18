@@ -1,0 +1,27 @@
+services:
+  picard:
+    image: mikenye/picard:latest
+    container_name: picard
+    environment:
+      - TZ=Europe/Stockholm
+    ports:
+      - 4800:5800
+    volumes:
+      - /mnt/user/appdata/musicbrainz/config:/config:rw
+      - /mnt/user/music:/music:rw
+
+  soulify:
+    container_name: soulify
+    build:
+      context: /mnt/user/appdata/soulify/soulify
+    user: 1000:100
+    environment:
+      - TZ=Europe/Stockholm
+    ports:
+      - 5811:5000
+    volumes:
+      - /mnt/user/appdata/soulify/soulify:/app
+      - /mnt/user/downloads:/downloads
+    command: [ "python", "/app/SpotWebApp.py" ]
+    stdin_open: true
+    tty: true

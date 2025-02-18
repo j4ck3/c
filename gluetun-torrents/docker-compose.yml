@@ -13,9 +13,9 @@ services:
       - 5031:5031 # slskd
       - 50300:50300 # slskd
       - 11470:11470 #stremio-server
+      - 12470:12470 #stremio-server https
       - 6565:6565 # nicotineplus
       - 2234:2234 # nicotineplus
-      - 7320:7320 # speedtest tracker
     volumes:
       - /mnt/user/appdata/gluetun:/gluetun
     environment:
@@ -46,35 +46,10 @@ services:
       - gluetun
     restart: always
 
-  slskd:
-    image: slskd/slskd
-    container_name: slskd
-    network_mode: "service:gluetun"
-    user: 1000:100
-    environment:
-      - SLSKD_UMASK=022
-      - SLSKD_REMOTE_CONFIGURATION=true
-      - SLSKD_SHARED_DIR=/music;/youtube-paywall
-      - SLSKD_SLSK_ADDRESS=vps.slsknet.org
-      - SLSKD_SLSK_PORT=2271
-      - SLSKD_SLSK_LISTEN_IP_ADDRESS=0.0.0.0
-      - SLSKD_SLSK_LISTEN_PORT=50300
-      - SLSKD_DOWNLOADS_DIR=/downloads
-      - SLSKD_INCOMPLETE_DIR=/incomplete
-    volumes:
-      - /mnt/user/downloads:/downloads
-      - /mnt/user/downloads/incomplete:/incomplete
-      - /mnt/user/appdata/slskd:/app
-      - /mnt/user/music:/music:rw
-      - /mnt/user/media/Youtube:/youtube-paywall:rw
-    restart: unless-stopped
-    depends_on:
-      - gluetun
-
   nicotineplus-proper:
     image: sirjmann92/nicotineplus-proper
     container_name: nicotine
-    network_mode: "service:gluetun"
+    network_mode: service:gluetun
     #  env_file: .env # Optionally use a .env file to store environment variables and login credentials
     environment:
       - TZ=Europe/Stockholm
@@ -87,16 +62,15 @@ services:
       - UPNP=False
       - AUTO_CONNECT=True
       - TRAY_ICON=False
-      - WEB_UI_PORT=6565 # for custom webUI port assignment. Should match 'port' env variable or VPN webUI port
+      - WEB_UI_PORT=6565
     volumes:
-      #- /your/media/directory:/downloads
-      #- /your/share/directory:/shared
+      - /mnt/user/downloads:/downloads
+      - /mnt/user/downloads/incomplete:/incomplete
+      - /mnt/user/music:/music:rw
+      - /mnt/user/media/Youtube:/youtube-paywall:rw
       - /mnt/user/appdata/nicotineplus-proper/config:/config
       - /mnt/user/appdata/nicotineplus-proper/data:/data
     restart: unless-stopped
-
-
-
   stremio-server:
     image: stremio/server:latest
     container_name: stremio-server
@@ -106,24 +80,12 @@ services:
       - STREMIO_PASSWORD=${STREMIO_PASSWORD}
       - FFMPEG_BIN=/bin/ffmpeg
       - FFPROBE_BIN=/bin/ffprobe
+      - NO_CORS=1
+      - APP_PATH=/stremio
     volumes:
       - /mnt/user/appdata/stremio-server:/stremio
       - /usr/bin/ffmpeg:/bin/ffmpeg:ro
       - /bin/ffprobe:/bin/ffprobe:ro
     depends_on:
       - gluetun
-      - ffmpeg
-    restart: unless-stopped
-
-  ffmpeg:
-    image: linuxserver/ffmpeg:latest
-    container_name: ffmpeg
-    devices:
-      - /dev/dri:/dev/dri
-    environment:
-      - VAAPI_DEVICE=/dev/dri/renderD128
-    stdin_open: true
-    tty: true
-    volumes:
-      - /mnt/user/appdata/ffmpeg:/config
     restart: unless-stopped
