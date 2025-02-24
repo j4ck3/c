@@ -72,12 +72,3 @@ networks:
         - subnet: 172.44.0.0/16
   br0:
     external: true
-  # pi_network:
-  #   name: pi_network
-  #   driver: macvlan
-  #   driver_opts:
-  #     parent: br0
-  #   ipam:
-  #     config:
-  #       - subnet: 192.168.1.0/24
-  #         gateway: 192.168.1.1
