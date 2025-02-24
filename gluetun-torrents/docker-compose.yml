@@ -33,7 +33,7 @@ services:
   qBittorrent:
     image: lscr.io/linuxserver/qbittorrent
     container_name: qBittorrent
-    network_mode: "service:gluetun"
+    network_mode: service:gluetun
     environment:
       - PUID=1000
       - PGID=100
@@ -74,7 +74,7 @@ services:
   stremio-server:
     image: stremio/server:latest
     container_name: stremio-server
-    network_mode: "service:gluetun"
+    network_mode: service:gluetun
     environment:
       - STREMIO_USERNAME=${STREMIO_USERNAME}
       - STREMIO_PASSWORD=${STREMIO_PASSWORD}
