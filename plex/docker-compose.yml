@@ -10,9 +10,10 @@ services:
             - /mnt/user/appdata/plex/temp:/transcode
             - /mnt/user/appdata/plex:/data
             - /mnt/user/media/Movies:/Movies
-            - /mnt/user/music:/Music
             - /mnt/user/media/TV:/TV Shows
             - /mnt/user/media/Youtube:/Youtube
+            - /mnt/user/music:/Music
+            - /mnt/user/podcasts:/Podcasts
             - /dev/shm:/transcode # set transcode folder in plex settings to /transcode
         environment:
             - PUID=1000

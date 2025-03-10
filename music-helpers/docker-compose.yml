@@ -9,6 +9,7 @@ services:
     volumes:
       - /mnt/user/appdata/musicbrainz/config:/config:rw
       - /mnt/user/music:/music:rw
+      - /mnt/user/podcasts:/podcasts:rw
 
   soulify:
     container_name: soulify

@@ -1,4 +1,3 @@
-version: '2.1'
 services:
   trilium:
     image: zadam/trilium:latest
@@ -13,6 +12,7 @@ services:
       - docker0
     labels:
       - "net.unraid.docker.icon=https://cdn.lo4d.com/t/icon/128/trilium-notes.png"
+    restart: unless-stopped
 
 networks:
   docker0:

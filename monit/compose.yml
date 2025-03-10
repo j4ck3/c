@@ -1,0 +1,42 @@
+services:
+  prometheus:
+    image: docker.io/prom/prometheus:v3.2.1
+    container_name: prometheus
+    ports:
+      - 9494:9090
+    command: --config.file=/etc/prometheus/prometheus.yaml
+    volumes:
+      - /mnt/user/appdata/prometheus/config/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - /mnt/user/appdata/prometheus/data:/prometheus
+    restart: unless-stopped
+  grafana:
+    image: docker.io/grafana/grafana-oss:11.5.2
+    container_name: grafana
+    ports:
+      - 3020:3000
+    volumes:
+      - /mnt/user/appdata/grafana/data:/var/lib/grafana
+    restart: unless-stopped
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:v1.9.0
+    container_name: node_exporter
+    command: --path.rootfs=/host
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - /:/host:ro,rslave
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.51.0
+    container_name: cadvisor
+    ports:
+      - 8484:8080
+    volumes:
+      - /:/rootfs:ro
+      - /run:/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    privileged: true
+    restart: unless-stopped

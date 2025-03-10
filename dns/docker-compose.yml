@@ -44,14 +44,15 @@ services:
       - FTLCONF_webserver_port=85
       - FTLCONF_dns_upstreams=172.44.0.9#5053
     volumes:
-      - /mnt/user/appdata/pihole/etc-pihole/:/etc/pihole/
-      - /mnt/user/appdata/pihole/etc-dnsmasq.d/:/etc/dnsmasq.d/
+      - /mnt/user/appdata/pihole/etc-pihole:/etc/pihole/
+      - /mnt/user/appdata/pihole/etc-dnsmasq.d:/etc/dnsmasq.d/
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
       - CAP_CHOWN
       - CAP_SYS_TIME
       - CAP_NET_BIND_SERVICE
+      - CAP_SYS_NICE
 
   unbound:
     container_name: unbound

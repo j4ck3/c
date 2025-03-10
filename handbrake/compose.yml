@@ -1,0 +1,23 @@
+services:
+  handbrake:
+    image: jlesage/handbrake
+    container_name: handbrake
+    restart: unless-stopped
+    ports:
+      - 5800:5800
+    volumes:
+      - /mnt:/storage
+      - /mnt/user/appdata/handbrake/output:/output
+      - /mnt/user/appdata/handbrake/config:/config
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      - USER_ID=1000
+      - GROUP_ID=100
+      - TZ=Europe/Stockholm
+      - AUTOMATED_CONVERSION_FORMAT=mp4
+      - AUTOMATED_CONVERSION_PRESET=Fast 1080p30
+      - VA_DRIVER=vaapi
+      - QSV_ENABLE=1
+      # - NVIDIA_VISIBLE_DEVICES=all
+      # docker cp handbrake:/output/'Bridget Jones Mad About the Boy (2025) WEBDL-1080p.m4v.m4v' /mnt/user/appdata/handbrake/output

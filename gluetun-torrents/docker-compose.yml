@@ -28,7 +28,7 @@ services:
       - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
       - TZ=Europe/Stockholm
       - UPDATER_PERIOD=24h
-    restart: always
+    restart: unless-stopped
 
   qBittorrent:
     image: lscr.io/linuxserver/qbittorrent
@@ -44,19 +44,18 @@ services:
       - /mnt/user/downloads:/downloads
     depends_on:
       - gluetun
-    restart: always
+    restart: unless-stopped
 
   nicotineplus-proper:
     image: sirjmann92/nicotineplus-proper
     container_name: nicotine
     network_mode: service:gluetun
-    #  env_file: .env # Optionally use a .env file to store environment variables and login credentials
     environment:
       - TZ=Europe/Stockholm
       - UMASK=022
       - DARKMODE=True
       - LOGIN=j0
-      - PASSW=monkee##33
+      - PASSW=Monkee##33
       - PUID=1000
       - PGID=100
       - UPNP=False
@@ -64,28 +63,49 @@ services:
       - TRAY_ICON=False
       - WEB_UI_PORT=6565
     volumes:
-      - /mnt/user/downloads:/downloads
-      - /mnt/user/downloads/incomplete:/incomplete
+      - /mnt/user/downloads/soulseek:/downloads
+      - /mnt/user/downloads/soulseek/incomplete:/incomplete
       - /mnt/user/music:/music:rw
-      - /mnt/user/media/Youtube:/youtube-paywall:rw
+      - /mnt/user/media/Youtube:/youtube-paywall:rww
+      - /mnt/user/podcasts:/podcasts:rw
+      - /mnt/user/syncthing/qqq:/nsfw:rw
       - /mnt/user/appdata/nicotineplus-proper/config:/config
       - /mnt/user/appdata/nicotineplus-proper/data:/data
     restart: unless-stopped
-  stremio-server:
-    image: stremio/server:latest
-    container_name: stremio-server
-    network_mode: service:gluetun
-    environment:
-      - STREMIO_USERNAME=${STREMIO_USERNAME}
-      - STREMIO_PASSWORD=${STREMIO_PASSWORD}
-      - FFMPEG_BIN=/bin/ffmpeg
-      - FFPROBE_BIN=/bin/ffprobe
-      - NO_CORS=1
-      - APP_PATH=/stremio
-    volumes:
-      - /mnt/user/appdata/stremio-server:/stremio
-      - /usr/bin/ffmpeg:/bin/ffmpeg:ro
-      - /bin/ffprobe:/bin/ffprobe:ro
     depends_on:
       - gluetun
+
+  sabnzbd:
+    image: lscr.io/linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    ports:
+      - "8801:8080"
+    environment:
+      - PUID=1000
+      - PGID=100
+      - TZ=Europe/Stockholm
+    volumes:
+      - /mnt/user/appdata/sabnzbd/config:/config
+      - /mnt/user/downloads/sabnzbd:/downloads
+      - /mnt/user/downloads/sabnzbd/incomplete:/incomplete-downloads
     restart: unless-stopped
+    depends_on:
+      - gluetun
+  # stremio-server:
+  #   image: stremio/server:latest
+  #   container_name: stremio-server
+  #   network_mode: service:gluetun
+  #   environment:
+  #     - STREMIO_USERNAME=${STREMIO_USERNAME}
+  #     - STREMIO_PASSWORD=${STREMIO_PASSWORD}
+  #     - FFMPEG_BIN=/bin/ffmpeg
+  #     - FFPROBE_BIN=/bin/ffprobe
+  #     - NO_CORS=1
+  #     - APP_PATH=/stremio
+  #   volumes:
+  #     - /mnt/user/appdata/stremio-server:/stremio
+  #     - /usr/bin/ffmpeg:/bin/ffmpeg:ro
+  #     - /bin/ffprobe:/bin/ffprobe:ro
+  #   depends_on:
+  #     - gluetun
+  #   restart: unless-stopped

@@ -1,0 +1,18 @@
+services:
+  kasm:
+    image: lscr.io/linuxserver/kasm:latest
+    container_name: kasm
+    privileged: true
+    environment:
+      - KASM_PORT=4431
+        # - DOCKER_HUB_USERNAME=USER
+        # - DOCKER_HUB_PASSWORD=PASS
+    volumes:
+      - /mnt/cache/appdata/kasm/data:/opt
+      - /mnt/cache/appdata/kasm/profiles:/profiles
+        # - /dev/input:/dev/input
+        # - /run/udev/data:/run/udev/data
+    ports:
+      - 3000:3000
+      - 4431:4431
+    restart: unless-stopped
