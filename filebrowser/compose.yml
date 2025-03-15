@@ -1,0 +1,15 @@
+services:
+  filebrowser:
+    image: filebrowser/filebrowser:s6
+    container_name: filebrowser
+    restart: unless-stopped
+    ports:
+      - 7171:80
+    environment:
+      - PUID=1000
+      - PGID=100
+      - TZ=Europe/Stockholm
+    volumes:
+      - /mnt/cache:/srv
+      - /mnt/cache/appdata/filebrowser/filebrowser.db:/database/filebrowser.db
+      - /mnt/user/appdata/filebrowser/settings.json:/config/settings.json
