@@ -1,0 +1,22 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    ports:
+      - 8086:8086
+    volumes:
+      - /mnt/user/appdata/jellyfin/config:/config
+      - /mnt/user/appdata/jellyfin/cache:/cache
+      - /mnt/user/media/Movies:/Movies
+      - /mnt/user/media/TV:/TV Shows
+      - /mnt/user/media/Youtube:/Youtube
+      - /mnt/user/music:/Music
+      - /mnt/user/podcasts:/Podcasts
+      - /dev/shm:/transcode # set transcode folder in plex settings to /transcode
+    environment:
+      - PUID=1000
+      - PGID=100
+      - TZ=Europe/Stockholm
+    devices:
+      - /dev/dri:/dev/dri
+    restart: unless-stopped

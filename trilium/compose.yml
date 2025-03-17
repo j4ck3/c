@@ -2,19 +2,14 @@ services:
   trilium:
     image: zadam/trilium:latest
     container_name: trilium
-    ports:
-      - "3737:8080"
+    labels:
+      - tsdproxy.enable=true
+      - tsdproxy.name=trilium
+      - net.unraid.docker.icon=https://cdn.lo4d.com/t/icon/128/trilium-notes.png
     environment:
       - TRILIUM_DATA_DIR=/home/node/trilium-data
+    ports:
+      - 6161:8080
     volumes:
       - /mnt/user/trilium:/home/node/trilium-data
-    networks:
-      - docker0
-    labels:
-      - "net.unraid.docker.icon=https://cdn.lo4d.com/t/icon/128/trilium-notes.png"
     restart: unless-stopped
-
-networks:
-  docker0:
-    name: docker0
-    external: true

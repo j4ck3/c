@@ -1,0 +1,15 @@
+services:
+  tsdproxy:
+    image: almeidapaulopt/tsdproxy:latest
+    container_name: tsdproxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - tsdproxydata:/data
+      - /mnt/user/appdata/tsdproxy/config:/config
+    environment:
+      - TSDPROXY_AUTHKEY=tskey-auth-kEgWak6nV321CNTRL-pKk5ipFcTubNTShGdPa5ubz9DR6QwNSwW
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  tsdproxydata:

@@ -1,0 +1,58 @@
+services:
+  gluetun_searxng:
+    image: qmcgaw/gluetun
+    container_name: gluetun_searxng
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - 8881:8888/tcp # HTTP proxy
+      - 8381:8388/tcp # Shadowsocks
+      - 8381:8388/udp # Shadowsocks
+      - 9393:8080/tcp # SearXNG
+    volumes:
+      - /mnt/user/appdata/searxng/gluetun:/gluetun
+    environment:
+      - VPN_SERVICE_PROVIDER=custom
+      - VPN_TYPE=${VPN_TYPE}
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - WIREGUARD_ENDPOINT_IP=${WIREGUARD_ENDPOINT_IP}
+      - WIREGUARD_ENDPOINT_PORT=${WIREGUARD_ENDPOINT_PORT}
+      - WIREGUARD_PUBLIC_KEY=${WIREGUARD_PUBLIC_KEY}
+      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
+      - TZ=Europe/Stockholm
+      - UPDATER_PERIOD=24h
+    networks:
+      - docker0
+
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    container_name: searxng
+    depends_on:
+      - gluetun_searxng
+    network_mode: service:gluetun_searxng
+    labels:
+      - tsdproxy.enable=true
+      - tsdproxy.name=searxng
+      - net.unraid.docker.icon=https://avatars.githubusercontent.com/u/80454229?s=48&v=4
+    environment:
+      - SEARXNG_BASE_URL=http://${SEARXNG_HOSTNAME}/
+      - UWSGI_WORKERS=${SEARXNG_UWSGI_WORKERS:-4}
+      - UWSGI_THREADS=${SEARXNG_UWSGI_THREADS:-4}
+    volumes:
+      - /mnt/user/appdata/searxng/searxng-data:/etc/searxng:rw'
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"
+
+networks:
+  docker0:
+    external: true
