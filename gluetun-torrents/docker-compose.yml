@@ -9,6 +9,7 @@ services:
     ports:
       - 8888:8888/tcp # HTTP proxy
       - 8080:8080 # qbittorrent
+      - 8000:8000 # http server
       - 5030:5030 # slskd
       - 5031:5031 # slskd
       - 50300:50300 # slskd
@@ -31,7 +32,7 @@ services:
     restart: unless-stopped
 
   qBittorrent:
-    image: lscr.io/linuxserver/qbittorrent
+    image: lscr.io/linuxserver/qbittorrent:lateset
     container_name: qBittorrent
     network_mode: service:gluetun
     environment:
@@ -41,21 +42,26 @@ services:
       - WEBUI_PORT=8080
     volumes:
       - /mnt/user/appdata/qbittorrent:/config
-      - /mnt/user/downloads:/downloads
+      - /mnt/user/downloads/qbitorrent:/downloads
     depends_on:
-      - gluetun
+      gluetun:
+        condition: service_healthy
     restart: unless-stopped
 
   nicotineplus-proper:
-    image: sirjmann92/nicotineplus-proper
+    image: sirjmann92/nicotineplus-proper:latest
     container_name: nicotine
-    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    env_file:
+      - .env
     environment:
       - TZ=Europe/Stockholm
       - UMASK=022
       - DARKMODE=True
-      - LOGIN=j0
-      - PASSW=Monkee##33
+      - LOGIN=${NICOTINE_USER}
+      - PASSW=${NICOTINE_PASSW}
       - PUID=1000
       - PGID=100
       - UPNP=False
@@ -72,25 +78,24 @@ services:
       - /mnt/user/appdata/nicotineplus-proper/config:/config
       - /mnt/user/appdata/nicotineplus-proper/data:/data
     restart: unless-stopped
-    depends_on:
-      - gluetun
+  # sabnzbd:
+  #   image: lscr.io/linuxserver/sabnzbd:latest
+  #   container_name: sabnzbd
+  #   ports:c
+  #     - "8801:8080"
+  #   environment:
+  #     - PUID=1000
+  #     - PGID=100
+  #     - TZ=Europe/Stockholm
+  #   volumes:
+  #     - /mnt/user/appdata/sabnzbd/config:/config
+  #     - /mnt/user/downloads/sabnzbd:/downloads
+  #     - /mnt/user/downloads/sabnzbd/incomplete:/incomplete-downloads
+  #   restart: unless-stopped
+  #   depends_on:
+  #     gluetun:
+  #       condition: service_healthy
 
-  sabnzbd:
-    image: lscr.io/linuxserver/sabnzbd:latest
-    container_name: sabnzbd
-    ports:
-      - "8801:8080"
-    environment:
-      - PUID=1000
-      - PGID=100
-      - TZ=Europe/Stockholm
-    volumes:
-      - /mnt/user/appdata/sabnzbd/config:/config
-      - /mnt/user/downloads/sabnzbd:/downloads
-      - /mnt/user/downloads/sabnzbd/incomplete:/incomplete-downloads
-    restart: unless-stopped
-    depends_on:
-      - gluetun
   # stremio-server:
   #   image: stremio/server:latest
   #   container_name: stremio-server
@@ -104,8 +109,9 @@ services:
   #     - APP_PATH=/stremio
   #   volumes:
   #     - /mnt/user/appdata/stremio-server:/stremio
-  #     - /usr/bin/ffmpeg:/bin/ffmpeg:ro
-  #     - /bin/ffprobe:/bin/ffprobe:ro
+  #     - /usr/local/bin/ffmpeg:/bin/ffmpeg:ro
+  #     - /usr/local/bin/ffprobe:/bin/ffprobe:ro
   #   depends_on:
-  #     - gluetun
+  #     gluetun:
+  #       condition: service_healthy
   #   restart: unless-stopped

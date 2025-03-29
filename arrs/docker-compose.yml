@@ -9,7 +9,7 @@ services:
     volumes:
       - /mnt/user/appdata/sonarr/config:/config
       - /mnt/user/media/TV:/tv
-      - /mnt/user/downloads:/downloads
+      - /mnt/user/downloads/qbitorrent:/downloads
     ports:
       - 8989:8989
     restart: unless-stopped

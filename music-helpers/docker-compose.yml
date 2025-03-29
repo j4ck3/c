@@ -22,7 +22,7 @@ services:
       - 5811:5000
     volumes:
       - /mnt/user/appdata/soulify/soulify:/app
-      - /mnt/user/downloads:/downloads
+      - /mnt/user/downloads/soulify:/downloads
     command: [ "python", "/app/SpotWebApp.py" ]
     stdin_open: true
     tty: true

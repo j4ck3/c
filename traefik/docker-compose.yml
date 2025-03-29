@@ -9,14 +9,14 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-       docker0:
+      docker0:
     ports:
       - 8050:80
       - 44350:443
       - 8055:8080
     environment:
       - CF_API_EMAIL=jacob.hallgren02@gmail.com
-      - CF_DNS_API_TOKEN=LDGx8V_axyv7TKjk2xorwThOO8XVbancKLXq6kt0
+      # - CF_DNS_API_TOKEN=LDGx8V_axyv7TKjk2xorwThOO8XVbancKLXq6kt0 revoke this key in cloudflare and create a new one in .env
       # - CF_API_KEY=YOU_API_KEY
     volumes:
       - /etc/localtime:/etc/localtime:ro
@@ -41,7 +41,6 @@ services:
       - "traefik.http.routers.traefik-secure.tls.domains[0].main=hjacke.com"
       - "traefik.http.routers.traefik-secure.tls.domains[0].sans=*.hjacke.com"
       - "traefik.http.routers.traefik-secure.service=api@internal"
-
 
 networks:
   docker0:

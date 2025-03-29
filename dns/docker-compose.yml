@@ -12,9 +12,9 @@ services:
     ports:
       # - 6882:6881
       # - 6882:6881/udp
-      # - 8888:8888/tcp # HTTP proxy
       # - 8388:8388/tcp # Shadowsocks
       # - 8388:8388/udp # Shadowsocks
+      - 8001:8000
       - 5053:53/tcp # unbound outbound dns
       - 5053:53/udp # unbound outbound dns
     volumes:
@@ -22,7 +22,7 @@ services:
     environment:
       - VPN_SERVICE_PROVIDER=custom
       - VPN_TYPE=${VPN_TYPE}
-      - WIREGUARD_ENDPOINT_IP=${WIREGUARD_ENDPOINT_PORT}
+      - WIREGUARD_ENDPOINT_IP=${WIREGUARD_ENDPOINT_IP}
       - WIREGUARD_ENDPOINT_PORT=${WIREGUARD_ENDPOINT_PORT}
       - WIREGUARD_PUBLIC_KEY=${WIREGUARD_PUBLIC_KEY}
       - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
@@ -46,9 +46,9 @@ services:
       - TZ=Europe/Stockholm
       - FTLCONF_webserver_port=80
       - FTLCONF_dns_upstreams=172.44.0.9#5053
+      - FTLCONF_webserver_api_password=${PIHOLE_API_KEY}
     volumes:
-      - /mnt/user/appdata/pihole/etc-pihole:/etc/pihole/
-      - /mnt/user/appdata/pihole/etc-dnsmasq.d:/etc/dnsmasq.d/
+      - /mnt/user/appdata/pihole/etc-pihole:/etc/pihole/:rw
     restart: unless-stopped
     labels:
       - tsdproxy.enable=true
@@ -72,7 +72,8 @@ services:
       - /mnt/user/appdata/unbound:/opt/unbound/etc/unbound
       - /dev/null:/dev/null
     depends_on:
-      - gluetun_dns
+      gluetun_dns:
+        condition: service_healthy
     restart: unless-stopped
 
 networks:

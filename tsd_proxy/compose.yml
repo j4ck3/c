@@ -7,7 +7,6 @@ services:
       - tsdproxydata:/data
       - /mnt/user/appdata/tsdproxy/config:/config
     environment:
-      - TSDPROXY_AUTHKEY=tskey-auth-kEgWak6nV321CNTRL-pKk5ipFcTubNTShGdPa5ubz9DR6QwNSwW
       - DOCKER_HOST=unix:///var/run/docker.sock
     restart: unless-stopped
 

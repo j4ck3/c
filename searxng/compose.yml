@@ -2,6 +2,7 @@ services:
   gluetun_searxng:
     image: qmcgaw/gluetun
     container_name: gluetun_searxng
+    restart: unless-stopped
     cap_add:
       - NET_ADMIN
     devices:
@@ -31,7 +32,8 @@ services:
     restart: unless-stopped
     container_name: searxng
     depends_on:
-      - gluetun_searxng
+      gluetun_searxng:
+        condition: service_healthy
     network_mode: service:gluetun_searxng
     labels:
       - tsdproxy.enable=true
@@ -42,7 +44,7 @@ services:
       - UWSGI_WORKERS=${SEARXNG_UWSGI_WORKERS:-4}
       - UWSGI_THREADS=${SEARXNG_UWSGI_THREADS:-4}
     volumes:
-      - /mnt/user/appdata/searxng/searxng-data:/etc/searxng:rw'
+      - /mnt/user/appdata/searxng/searxng-data:/etc/searxng:rw
     cap_add:
       - CHOWN
       - SETGID

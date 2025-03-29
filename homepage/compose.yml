@@ -1,0 +1,43 @@
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    environment:
+      - TZ=Europe/Stockholm
+      # - HOMEPAGE_ALLOWED_HOSTS=http://192.168.1.24:3311
+      - HOMEPAGE_ALLOWED_HOSTS=*
+      - PUID=1000
+      - PGID=100
+      - HOMEPAGE_VAR_GLUETUN_TORRENT_KEY=${HOMEPAGE_VAR_GLUETUN_TORRENT_KEY}
+      - HOMEPAGE_VAR_GLUETUN_DNS_KEY=${HOMEPAGE_VAR_GLUETUN_TORRENT_KEY}
+      - HOMEPAGE_VAR_RADARR_API_KEY=${HOMEPAGE_VAR_RADARR_API_KEY}
+      - HOMEPAGE_VAR_PIHOLE_KEY=${HOMEPAGE_VAR_PIHOLE_KEY}
+      - HOMEPAGE_VAR_TAILSCALE_KEY=${HOMEPAGE_VAR_TAILSCALE_KEY}
+      - HOMEPAGE_VAR_OVERSEER_KEY=${HOMEPAGE_VAR_OVERSEER_KEY}
+      - HOMEPAGE_VAR_PLEX=${HOMEPAGE_VAR_PLEX}
+      - HOMEPAGE_VAR_QBITTORRENT_USER=${HOMEPAGE_VAR_QBITTORRENT_USER}
+      - HOMEPAGE_VAR_QBITTORRENT_PASSWORD=${HOMEPAGE_VAR_QBITTORRENT_PASSWORD}
+      - HOMEPAGE_VAR_PROWLARR=${HOMEPAGE_VAR_PROWLARR}
+      - HOMEPAGE_VAR_SONARR=${HOMEPAGE_VAR_SONARR}
+    ports:
+      - 3311:3000
+    volumes:
+      - /mnt/user/appdata/homepage/config:/app/config
+    labels:
+      - tsdproxy.enable=true
+      - tsdproxy.name=homepage
+    restart: unless-stopped
+
+  dockerproxy:
+    image: ghcr.io/tecnativa/docker-socket-proxy:0.3.0
+    container_name: dockerproxy
+    environment:
+      - CONTAINERS=1 # Allow access to viewing containers
+      - SERVICES=1 # Allow access to viewing services (necessary when using Docker Swarm)
+      - TASKS=1 # Allow access to viewing tasks (necessary when using Docker Swarm)
+      - POST=0 # Disallow any POST operations (effectively read-only)
+    ports:
+      - 127.0.0.1:2375:2375
+    volumes:
+      - /run/docker.sock:/run/docker.sock:ro # Mounted as read-only
+    restart: unless-stopped
