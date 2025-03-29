@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:latest
@@ -13,6 +11,16 @@ services:
       - "5432:5432"
     volumes:
       - /mnt/user/appdata/postgres:/var/lib/postgresql/data
+
+  mysql:
+    image: mysql:latest
+    container_name: mysql
+    hostname: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DB}
+    ports:
+      - "3306:3306"
 
   adminer:
     image: adminer:latest

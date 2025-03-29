@@ -49,6 +49,7 @@ services:
       - FTLCONF_webserver_api_password=${PIHOLE_API_KEY}
     volumes:
       - /mnt/user/appdata/pihole/etc-pihole:/etc/pihole/:rw
+      - /mnt/user/appdata/pihole/etc-pihole:/var/log/pihole/:rw
     restart: unless-stopped
     labels:
       - tsdproxy.enable=true
