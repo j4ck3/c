@@ -17,6 +17,7 @@ services:
       - 12470:12470 #stremio-server https
       - 6565:6565 # nicotineplus
       - 2234:2234 # nicotineplus
+      - 7474:7474 # autobrr
     volumes:
       - /mnt/user/appdata/gluetun:/gluetun
     environment:
@@ -79,40 +80,3 @@ services:
       - /mnt/user/appdata/nicotineplus-proper/config:/config
       - /mnt/user/appdata/nicotineplus-proper/data:/data
     restart: unless-stopped
-  # sabnzbd:
-  #   image: lscr.io/linuxserver/sabnzbd:latest
-  #   container_name: sabnzbd
-  #   ports:c
-  #     - "8801:8080"
-  #   environment:
-  #     - PUID=1000
-  #     - PGID=100
-  #     - TZ=Europe/Stockholm
-  #   volumes:
-  #     - /mnt/user/appdata/sabnzbd/config:/config
-  #     - /mnt/user/downloads/sabnzbd:/downloads
-  #     - /mnt/user/downloads/sabnzbd/incomplete:/incomplete-downloads
-  #   restart: unless-stopped
-  #   depends_on:
-  #     gluetun:
-  #       condition: service_healthy
-
-  # stremio-server:
-  #   image: stremio/server:latest
-  #   container_name: stremio-server
-  #   network_mode: service:gluetun
-  #   environment:
-  #     - STREMIO_USERNAME=${STREMIO_USERNAME}
-  #     - STREMIO_PASSWORD=${STREMIO_PASSWORD}
-  #     - FFMPEG_BIN=/bin/ffmpeg
-  #     - FFPROBE_BIN=/bin/ffprobe
-  #     - NO_CORS=1
-  #     - APP_PATH=/stremio
-  #   volumes:
-  #     - /mnt/user/appdata/stremio-server:/stremio
-  #     - /usr/local/bin/ffmpeg:/bin/ffmpeg:ro
-  #     - /usr/local/bin/ffprobe:/bin/ffprobe:ro
-  #   depends_on:
-  #     gluetun:
-  #       condition: service_healthy
-  #   restart: unless-stopped

@@ -1,18 +1,16 @@
 services:
-    macos:
-        container_name: macos
-        image: docker-osx-vnc:latest
-        privileged: true
+    docker-osx:
+        image: sickcodes/docker-osx:latest
+        container_name: docker-osx-monterey
         devices:
             - /dev/kvm
-        network_mode: host
-        cap_add:
-            - ALL
         ports:
-            - 5999:5999
-            - 50922:10022
+            - "50922:10022"
+            - "5999:5999" # maps VNC :99 to host port 5999
         environment:
-            - DISPLAY=${DISPLAY:-:0.0}
-            - EXTRA="-display none -vnc 0.0.0.0:99,password=on
-        volumes:
-            - /tmp/.X11-unix:/tmp/.X11-unix
+            GENERATE_UNIQUE: "true"
+            MASTER_PLIST_URL: "https://raw.githubusercontent.com/sickcodes/osx-serial-generator/master/config-custom.plist"
+            SHORTNAME: "monterey"
+            EXTRA: "-display none -vnc 0.0.0.0:99,password=on"
+        stdin_open: true
+        tty: true
