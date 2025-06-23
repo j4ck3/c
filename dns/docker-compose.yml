@@ -1,36 +1,4 @@
 services:
-  gluetun_dns:
-    image: qmcgaw/gluetun:latest
-    networks:
-      dns_net:
-        ipv4_address: 172.44.0.9
-    container_name: gluetun_dns
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    ports:
-      # - 6882:6881
-      # - 6882:6881/udp
-      # - 8388:8388/tcp # Shadowsocks
-      # - 8388:8388/udp # Shadowsocks
-      - 8001:8000
-      - 5053:53/tcp # unbound outbound dns
-      - 5053:53/udp # unbound outbound dns
-    volumes:
-      - /mnt/user/appdata/gluetun_dns:/gluetun
-    environment:
-      - VPN_SERVICE_PROVIDER=custom
-      - VPN_TYPE=${VPN_TYPE}
-      - WIREGUARD_ENDPOINT_IP=${WIREGUARD_ENDPOINT_IP}
-      - WIREGUARD_ENDPOINT_PORT=${WIREGUARD_ENDPOINT_PORT}
-      - WIREGUARD_PUBLIC_KEY=${WIREGUARD_PUBLIC_KEY}
-      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
-      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
-      - UPDATER_PERIOD=24h
-      - TZ=Europe/Stockholm
-    restart: unless-stopped
-
   pihole:
     container_name: pihole
     hostname: pihole
@@ -45,7 +13,10 @@ services:
     environment:
       - TZ=Europe/Stockholm
       - FTLCONF_webserver_port=80
-      - FTLCONF_dns_upstreams=172.44.0.9#5053
+      - FTLCONF_dns_upstreams=9.9.9.9
+      #- FTLCONF_dns_upstreams=172.44.0.8#5053 # unbound
+      #- FTLCONF_dns_upstreams=9.9.9.9
+      #- FTLCONF_dns_upstreams=192.168.1.24#5153 # Cloudflared DoH proxy
       - FTLCONF_webserver_api_password=${PIHOLE_API_KEY}
     volumes:
       - /mnt/user/appdata/pihole/etc-pihole:/etc/pihole/:rw
@@ -56,8 +27,6 @@ services:
       - tsdproxy.name=pihole
       - tsdproxy.autodetect=false
       - tsdproxy.container_port=80
-    depends_on:
-      - unbound
     cap_add:
       - NET_ADMIN
       - CAP_CHOWN
@@ -68,13 +37,15 @@ services:
   unbound:
     container_name: unbound
     image: mvance/unbound:latest
-    network_mode: service:gluetun_dns
     volumes:
       - /mnt/user/appdata/unbound:/opt/unbound/etc/unbound
-      - /dev/null:/dev/null
-    depends_on:
-      gluetun_dns:
-        condition: service_healthy
+      - /dev/null:/dev/null:rw
+    ports:
+      - 5053:53/tcp
+      - 5053:53/udp
+    networks:
+      dns_net:
+        ipv4_address: 172.44.0.8
     restart: unless-stopped
 
 networks:
