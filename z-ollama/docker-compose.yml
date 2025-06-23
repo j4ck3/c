@@ -4,16 +4,24 @@ services:
     container_name: ollama
     pull_policy: always
     restart: unless-stopped
-    runtime: nvidia
+    network_mode: host
     tty: true
     environment:
+      - OLLAMA_KEEP_ALIVE=24h
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
       - ollama:/root/.ollama
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [ gpu ]
 
   open-webui:
-    #build:
+    #build:f
     #  context: .
     #  args:
     #    OLLAMA_BASE_URL: '/ollama'
@@ -25,7 +33,7 @@ services:
     depends_on:
       - ollama
     ports:
-      - ${OPEN_WEBUI_PORT-3000}:8080
+      - ${OPEN_WEBUI_PORT-4000}:8080
     environment:
       - 'OLLAMA_BASE_URL=http://ollama:11434'
     extra_hosts:
