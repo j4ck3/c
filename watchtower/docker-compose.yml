@@ -2,13 +2,39 @@ services:
   watchtower:
     image: containrrr/watchtower
     container_name: watchtower
+    env_file:
+      - .env
     environment:
+      - DOCKER_API_VERSION=1.44
       - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_POLL_INTERVAL=60
       - WATCHTOWER_INCLUDE_STOPPED=true
-      - WATCHTOWER_DISABLE_CONTAINERS=gluetun-dns gluetun zonos_container soulify
+      - WATCHTOWER_DISABLE_CONTAINERS=gluetun-dns gluetun zonos_container soulify postgres 3dcommerce_prod_db muddra_prod_db
       - WATCHTOWER_INCLUDE_RESTARTING=true
-      # - WATCHTOWER_ROLLING_RESTART=true
+      - WATCHTOWER_NOTIFICATIONS=shoutrrr
+      - WATCHTOWER_NOTIFICATION_URL=telegram://${WATCHTOWER_TELEGRAM_BOT_TOKEN}@telegram?chats=${WATCHTOWER_TELEGRAM_CHAT}
+      - WATCHTOWER_ROLLING_RESTART=true
+      - DOCKER_CONFIG=/config
+      # HTTP API for webhook triggers
+      - WATCHTOWER_HTTP_API_UPDATE=true
+      - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_API_TOKEN}
+      - WATCHTOWER_HTTP_API_PERIODIC_POLLS=true
+    expose:
+      - "8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.watchtower.rule=Host(`watchtower.muddra.com`)"
+      - "traefik.http.routers.watchtower.entrypoints=websecure"
+      - "traefik.http.routers.watchtower.tls=true"
+      - "traefik.http.services.watchtower.loadbalancer.server.port=8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /home/ubuntu/.docker:/config:ro
+    networks:
+      - traefik
     restart: unless-stopped
+
+networks:
+  traefik:
+    external: true

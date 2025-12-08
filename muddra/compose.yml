@@ -1,8 +1,9 @@
 services:
   muddra:
     image: ghcr.io/j4ck3/muddra:latest
-    container_name: muddra
     restart: unless-stopped
+    deploy:
+      replicas: 3
     expose:
       - "8080"
     env_file:
