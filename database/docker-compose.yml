@@ -1,26 +1,45 @@
 services:
   postgres:
-    image: postgres:latest
+    image: postgres:17
     container_name: postgres
-    restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+    restart: unless-stopped
     ports:
       - "5432:5432"
-    volumes:
-      - /mnt/user/appdata/postgres:/var/lib/postgresql/data
-
-  mysql:
-    image: mysql:latest
-    container_name: mysql
-    hostname: mysql
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DB}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  muddra_prod_db:
+    image: postgres:17
+    container_name: muddra_prod_db
+    restart: unless-stopped
     ports:
-      - "3306:3306"
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${MUDDRA_PASSWORD_PROD}
+      POSTGRES_DB: postgres
+    volumes:
+      - muddra_data:/var/lib/postgresql/data
+    networks:
+      - default
+      - database
+
+  3dcommerce_prod_db:
+    image: postgres:17
+    container_name: "3dcommerce_prod_db"
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: "3dcommerce_prod"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_PROD}
+      POSTGRES_DB: "3dcommerce_prod"
+    volumes:
+      - 3dcommerce_data:/var/lib/postgresql/data
 
   adminer:
     image: adminer:latest
@@ -28,3 +47,13 @@ services:
     restart: always
     ports:
       - "8383:8080"
+
+volumes:
+  postgres_data:
+  muddra_data:
+  3dcommerce_data:
+
+
+networks:
+  database:
+    name: database

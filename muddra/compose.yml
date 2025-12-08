@@ -1,0 +1,29 @@
+services:
+  muddra:
+    image: ghcr.io/j4ck3/muddra:latest
+    container_name: muddra
+    restart: unless-stopped
+    expose:
+      - "8080"
+    env_file:
+      - .env
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://0.0.0.0:8080
+      - Urls=http://0.0.0.0:8080
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.muddra.rule=Host(`muddra.com`)"
+      - "traefik.http.routers.muddra.entrypoints=websecure"
+      - "traefik.http.routers.muddra.tls=true"
+      - "traefik.http.services.muddra.loadbalancer.server.port=8080"
+    networks:
+      - traefik
+      - database
+
+networks:
+  traefik:
+    external: true
+  database:
+    external: true
