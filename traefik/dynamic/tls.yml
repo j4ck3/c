@@ -2,6 +2,9 @@ tls:
   certificates:
     - certFile: /etc/traefik/certs/origin.pem
       keyFile: /etc/traefik/certs/origin-key.pem
+    - certFile: /etc/traefik/certs/rjhdesign.pem
+      keyFile: /etc/traefik/certs/rjhdesign-key.pem
+
 
 
 
