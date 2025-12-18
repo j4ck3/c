@@ -1,10 +1,17 @@
 services:
+
+# if css fails again: 
+# cd /home/ubuntu/c/erpnext
+# docker compose up -d --force-recreate
+# docker compose exec -T frontend bash -lc 'export PATH="/home/frappe/.nvm/versions/node/v20.19.2/bin:$PATH"; bench build --production'
+# docker compose restart frontend
   configurator:
     image: frappe/erpnext:latest
     container_name: erpnext_configurator
     restart: on-failure
     volumes:
       - sites:/home/frappe/frappe-bench/sites
+      - assets:/home/frappe/frappe-bench/sites/assets
     entrypoint:
       - bash
       - -c
@@ -36,6 +43,7 @@ services:
     restart: "no"
     volumes:
       - sites:/home/frappe/frappe-bench/sites
+      - assets:/home/frappe/frappe-bench/sites/assets
     entrypoint:
       - bash
       - -c
@@ -73,6 +81,7 @@ services:
     restart: unless-stopped
     volumes:
       - sites:/home/frappe/frappe-bench/sites
+      - assets:/home/frappe/frappe-bench/sites/assets
     networks:
       - erpnext
     depends_on:
@@ -96,6 +105,7 @@ services:
       CLIENT_MAX_BODY_SIZE: ${CLIENT_MAX_BODY_SIZE:-50m}
     volumes:
       - sites:/home/frappe/frappe-bench/sites
+      - assets:/home/frappe/frappe-bench/sites/assets
     expose:
       - "8080"
     labels:
@@ -130,6 +140,7 @@ services:
       - /home/frappe/frappe-bench/apps/frappe/socketio.js
     volumes:
       - sites:/home/frappe/frappe-bench/sites
+      - assets:/home/frappe/frappe-bench/sites/assets
     expose:
       - "9000"
     networks:
@@ -145,6 +156,7 @@ services:
     command: bench worker --queue short,default
     volumes:
       - sites:/home/frappe/frappe-bench/sites
+      - assets:/home/frappe/frappe-bench/sites/assets
     networks:
       - erpnext
     depends_on:
@@ -158,6 +170,7 @@ services:
     command: bench worker --queue long,default,short
     volumes:
       - sites:/home/frappe/frappe-bench/sites
+      - assets:/home/frappe/frappe-bench/sites/assets
     networks:
       - erpnext
     depends_on:
@@ -171,6 +184,7 @@ services:
     command: bench schedule
     volumes:
       - sites:/home/frappe/frappe-bench/sites
+      - assets:/home/frappe/frappe-bench/sites/assets
     networks:
       - erpnext
     depends_on:
@@ -245,6 +259,7 @@ services:
 
 volumes:
   sites:
+  assets:
   mariadb_data:
   redis_cache_data:
   redis_queue_data:
