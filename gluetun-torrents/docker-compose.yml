@@ -79,4 +79,5 @@ services:
       - /mnt/user/syncthing/qqq:/nsfw:rw
       - /mnt/user/appdata/nicotineplus-proper/config:/config
       - /mnt/user/appdata/nicotineplus-proper/data:/data
+      - /mnt/user/syncthing/apps:/apps:rw
     restart: unless-stopped

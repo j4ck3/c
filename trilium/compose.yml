@@ -1,15 +1,50 @@
+configs:
+  trilium-ts-serve:
+    content: |
+      {
+        "TCP": {
+          "443": { "HTTPS": true }
+        },
+        "Web": {
+          "${TS_CERT_DOMAIN}:443": {
+            "Handlers": {
+              "/": {
+                "Proxy": "http://127.0.0.1:8080"
+              }
+            }
+          }
+        },
+        "AllowFunnel": {
+          "${TS_CERT_DOMAIN}:443": false
+        }
+      }
+
 services:
+  trilium-ts:
+    image: tailscale/tailscale:latest
+    container_name: trilium-ts
+    hostname: trilium
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SERVE_CONFIG=/config/serve.json
+      - TS_USERSPACE=true
+    configs:
+      - source: trilium-ts-serve
+        target: /config/serve.json
+    volumes:
+      - trilium-ts-state:/var/lib/tailscale
+    restart: unless-stopped
+
   trilium:
     image: zadam/trilium:latest
     container_name: trilium
-    labels:
-      - tsdproxy.enable=true
-      - tsdproxy.name=trilium
-      - net.unraid.docker.icon=https://cdn.lo4d.com/t/icon/128/trilium-notes.png
+    network_mode: service:trilium-ts
     environment:
       - TRILIUM_DATA_DIR=/home/node/trilium-data
-    ports:
-      - 6161:8080
     volumes:
       - /mnt/user/trilium:/home/node/trilium-data
     restart: unless-stopped
+
+volumes:
+  trilium-ts-state:

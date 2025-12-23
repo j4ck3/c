@@ -13,6 +13,7 @@ services:
       - /mnt/user/trilium:/trilium
       - /mnt/user/music:/music
       - /mnt/user/appdata:/unraid-appdata
+      - /mnt/user/syncthing/apps:/apps
     ports:
       - 8384:8384
       - 22000:22000/tcp

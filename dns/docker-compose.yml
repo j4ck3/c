@@ -4,8 +4,8 @@ services:
     hostname: pihole
     image: pihole/pihole:latest
     networks:
-      br0:
-        ipv4_address: 192.168.1.53
+      br0_docker:
+        ipv4_address: 10.0.0.53
     ports:
       - 53:53/tcp
       - 53:53/udp
@@ -54,5 +54,5 @@ networks:
     ipam:
       config:
         - subnet: 172.44.0.0/16
-  br0:
+  br0_docker:
     external: true
