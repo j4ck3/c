@@ -2,6 +2,7 @@ services:
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
+    hostname: sonarr
     environment:
       - PUID=1000
       - PGID=100
@@ -12,4 +13,27 @@ services:
       - /mnt/user/downloads/qbitorrent:/downloads
     ports:
       - 8989:8989
+    networks:
+      - arrs_default
     restart: unless-stopped
+
+  overseerr:
+    image: lscr.io/linuxserver/overseerr:latest
+    container_name: overseerr
+    hostname: overseerr
+    restart: unless-stopped
+    networks:
+      - arrs_default
+    ports:
+      - "5055:5055"
+    volumes:
+      - /mnt/user/appdata/overseerr:/config
+      - /mnt/user/media:/media
+    environment:
+      - PUID=1000
+      - PGID=100
+      - TZ=Etc/UTC
+
+networks:
+  arrs_default:
+    external: true
