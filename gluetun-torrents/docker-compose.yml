@@ -2,6 +2,7 @@ services:
   gluetun:
     image: qmcgaw/gluetun:latest
     container_name: gluetun
+    hostname: gluetun
     cap_add:
       - NET_ADMIN
     devices:
@@ -13,8 +14,6 @@ services:
       - 5030:5030 # slskd
       - 5031:5031 # slskd
       - 50300:50300 # slskd
-      - 11470:11470 #stremio-server
-      - 12470:12470 #stremio-server https
       - 6565:6565 # nicotineplus
       - 2234:2234 # nicotineplus
       - 7474:7474 # autobrr
@@ -30,6 +29,9 @@ services:
       - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
       - TZ=Europe/Stockholm
       - UPDATER_PERIOD=24h
+    networks:
+      - gluetun_net
+      - npm_services
     restart: unless-stopped
 
   qBittorrent:
@@ -81,3 +83,9 @@ services:
       - /mnt/user/appdata/nicotineplus-proper/data:/data
       - /mnt/user/syncthing/apps:/apps:rw
     restart: unless-stopped
+
+networks:
+  gluetun_net:
+    driver: bridge
+  npm_services:
+    external: true

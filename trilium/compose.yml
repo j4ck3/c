@@ -34,6 +34,8 @@ services:
         target: /config/serve.json
     volumes:
       - trilium-ts-state:/var/lib/tailscale
+    networks:
+      - npm_services
     restart: unless-stopped
 
   trilium:
@@ -48,3 +50,7 @@ services:
 
 volumes:
   trilium-ts-state:
+
+networks:
+  npm_services:
+    external: true

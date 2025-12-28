@@ -4,12 +4,12 @@ services:
     container_name: Nginx-Proxy-Manager-Official
     restart: unless-stopped
     # Using macvlan network to give NPM its own IP address (10.0.0.25) for external access
-    # Also connecting to arrs_default network to communicate with Radarr
-    # Flow: DuckDNS -> 10.0.0.25:80/443 (NPM) -> Radarr IP on arrs_default:7878
+    # Also connecting to npm_services network to communicate with proxied services
+    # Flow: DuckDNS -> 10.0.0.25:80/443 (NPM) -> Service via Docker hostname
     networks:
       br0_docker:
         ipv4_address: 10.0.0.25  # NPM will have its own IP for external access
-      arrs_default: {}
+      npm_services: {}
     volumes:
       - /mnt/user/appdata/Nginx-Proxy-Manager-Official/data:/data
       - /mnt/user/appdata/Nginx-Proxy-Manager-Official/letsencrypt:/etc/letsencrypt
@@ -26,6 +26,6 @@ services:
 networks:
   br0_docker:
     external: true
-  arrs_default:
+  npm_services:
     external: true
 

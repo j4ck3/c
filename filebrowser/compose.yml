@@ -2,6 +2,7 @@ services:
   filebrowser:
     image: filebrowser/filebrowser:s6
     container_name: filebrowser
+    hostname: filebrowser
     restart: unless-stopped
     ports:
       - 7171:80
@@ -13,3 +14,10 @@ services:
       - /mnt/cache:/srv
       - /mnt/cache/appdata/filebrowser/filebrowser.db:/database/filebrowser.db
       - /mnt/user/appdata/filebrowser/settings.json:/config/settings.json
+    networks:
+      - default
+      - npm_services
+
+networks:
+  npm_services:
+    external: true

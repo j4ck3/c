@@ -14,7 +14,7 @@ services:
     ports:
       - 8989:8989
     networks:
-      - arrs_default
+      - npm_services
     restart: unless-stopped
 
   overseerr:
@@ -23,7 +23,7 @@ services:
     hostname: overseerr
     restart: unless-stopped
     networks:
-      - arrs_default
+      - npm_services
     ports:
       - "5055:5055"
     volumes:
@@ -35,5 +35,5 @@ services:
       - TZ=Etc/UTC
 
 networks:
-  arrs_default:
+  npm_services:
     external: true

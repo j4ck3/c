@@ -1,0 +1,22 @@
+services:
+  freshrss:
+    image: lscr.io/linuxserver/freshrss:latest
+    container_name: freshrss
+    hostname: freshrss
+    restart: unless-stopped
+    ports:
+      - "6464:80"
+    volumes:
+      - /mnt/user/appdata/freshrss:/config
+    environment:
+      - PUID=99
+      - PGID=100
+      - UMASK=022
+      - TZ=Sweden/Stockholm
+    networks:
+      - npm_services
+
+networks:
+  npm_services:
+    external: true
+

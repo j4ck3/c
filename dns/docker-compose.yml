@@ -6,6 +6,7 @@ services:
     networks:
       br0_docker:
         ipv4_address: 10.0.0.53
+      npm_services:
     ports:
       - 53:53/tcp
       - 53:53/udp
@@ -22,11 +23,6 @@ services:
       - /mnt/user/appdata/pihole/etc-pihole:/etc/pihole/:rw
       - /mnt/user/appdata/pihole/etc-pihole:/var/log/pihole/:rw
     restart: unless-stopped
-    labels:
-      - tsdproxy.enable=true
-      - tsdproxy.name=pihole
-      - tsdproxy.autodetect=false
-      - tsdproxy.container_port=80
     cap_add:
       - NET_ADMIN
       - CAP_CHOWN
@@ -55,4 +51,6 @@ networks:
       config:
         - subnet: 172.44.0.0/16
   br0_docker:
+    external: true
+  npm_services:
     external: true

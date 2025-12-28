@@ -2,6 +2,7 @@ services:
   gluetun_searxng:
     image: qmcgaw/gluetun
     container_name: gluetun_searxng
+    hostname: gluetun_searxng
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
@@ -15,17 +16,16 @@ services:
     volumes:
       - /mnt/user/appdata/searxng/gluetun:/gluetun
     environment:
-      - VPN_SERVICE_PROVIDER=custom
+      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER}
       - VPN_TYPE=${VPN_TYPE}
       - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
-      - WIREGUARD_ENDPOINT_IP=${WIREGUARD_ENDPOINT_IP}
-      - WIREGUARD_ENDPOINT_PORT=${WIREGUARD_ENDPOINT_PORT}
       - WIREGUARD_PUBLIC_KEY=${WIREGUARD_PUBLIC_KEY}
       - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
       - TZ=Europe/Stockholm
       - UPDATER_PERIOD=24h
     networks:
       - docker0
+      - npm_services
 
   searxng:
     image: searxng/searxng:latest
@@ -40,7 +40,7 @@ services:
       - tsdproxy.name=searxng
       - net.unraid.docker.icon=https://avatars.githubusercontent.com/u/80454229?s=48&v=4
     environment:
-      - SEARXNG_BASE_URL=http://${SEARXNG_HOSTNAME}/
+      - SEARXNG_BASE_URL=https://${SEARXNG_HOSTNAME}/
       - UWSGI_WORKERS=${SEARXNG_UWSGI_WORKERS:-4}
       - UWSGI_THREADS=${SEARXNG_UWSGI_THREADS:-4}
     volumes:
@@ -56,5 +56,8 @@ services:
         max-file: "1"
 
 networks:
+
   docker0:
     external: true
+  npm_services:
+    external: true 
