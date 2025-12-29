@@ -1,0 +1,50 @@
+services:
+  bolaget-frontend:
+    image: ghcr.io/j4ck3/bolaget-skraparen:latest
+    container_name: bolaget-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=https://bolaget.hjacke.com/api
+      - API_URL=http://stock-scraper-api:5000
+    networks:
+      - traefik
+      - app-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bolaget.rule=Host(`bolaget.hjacke.com`)"
+      - "traefik.http.routers.bolaget.entrypoints=websecure"
+      - "traefik.http.routers.bolaget.tls.certresolver=letsencrypt"
+      - "traefik.http.services.bolaget.loadbalancer.server.port=3000"
+      - "traefik.docker.network=traefik"
+
+  stock-scraper-api:
+    image: ghcr.io/j4ck3/stock-scraper:latest
+    container_name: stock-scraper-api
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      # Add your environment variables here
+      # - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      # - TELEGRAM_CHANNELID=${TELEGRAM_CHANNELID}
+      # Triggiz service requires these (set to empty to skip):
+      - LOGIN_URL=${LOGIN_URL:-}
+      - NORDIC_WELLNESS_LOGIN_EMAIL=${NORDIC_WELLNESS_LOGIN_EMAIL:-}
+      - NORDIC_WELLNESS_LOGIN_PASSWORD=${NORDIC_WELLNESS_LOGIN_PASSWORD:-}
+    networks:
+      - traefik
+      - app-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bolaget-api.rule=Host(`bolaget.hjacke.com`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.bolaget-api.entrypoints=websecure"
+      - "traefik.http.routers.bolaget-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.bolaget-api.loadbalancer.server.port=5000"
+      - "traefik.docker.network=traefik"
+
+networks:
+  traefik:
+    external: true
+  app-network:
+    driver: bridge
