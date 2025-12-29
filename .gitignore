@@ -1,3 +1,7 @@
 .env
 *.log
 traefik/certs/
+
+# Traefik ACME certificates (contains private keys)
+traefik/acme/
+traefik/acme.json
