@@ -32,6 +32,18 @@ services:
     networks:
       - gluetun_net
       - npm_services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.qbittorrent.rule=Host(`torrent.hjacke.com`)"
+      - "traefik.http.routers.qbittorrent.entrypoints=websecure"
+      - "traefik.http.routers.qbittorrent.tls=true"
+      - "traefik.http.routers.qbittorrent.service=qbittorrent"
+      - "traefik.http.services.qbittorrent.loadbalancer.server.port=8080"
+      - "traefik.http.routers.nicotine.rule=Host(`nicotine.hjacke.com`)"
+      - "traefik.http.routers.nicotine.entrypoints=websecure"
+      - "traefik.http.routers.nicotine.tls=true"
+      - "traefik.http.routers.nicotine.service=nicotine"
+      - "traefik.http.services.nicotine.loadbalancer.server.port=6565"
     restart: unless-stopped
 
   qBittorrent:

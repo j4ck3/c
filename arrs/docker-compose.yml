@@ -15,6 +15,59 @@ services:
       - 8989:8989
     networks:
       - npm_services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sonarr.rule=Host(`sonarr.hjacke.com`)"
+      - "traefik.http.routers.sonarr.entrypoints=websecure"
+      - "traefik.http.routers.sonarr.tls=true"
+      - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    hostname: radarr
+    environment:
+      - PUID=1000
+      - PGID=100
+      - TZ=Etc/UTC
+    volumes:
+      - /mnt/user/appdata/binhex-radarr/config:/config
+      - /mnt/user/media/Movies:/movies
+      - /mnt/user/downloads/qbitorrent:/downloads
+    ports:
+      - 7878:7878
+    networks:
+      - npm_services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.radarr.rule=Host(`radarr.hjacke.com`)"
+      - "traefik.http.routers.radarr.entrypoints=websecure"
+      - "traefik.http.routers.radarr.tls=true"
+      - "traefik.http.services.radarr.loadbalancer.server.port=7878"
+    restart: unless-stopped
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    hostname: bazarr
+    environment:
+      - PUID=1000
+      - PGID=100
+      - TZ=Etc/UTC
+    volumes:
+      - /mnt/user/appdata/bazarr/config:/config
+      - /mnt/user/media:/media
+    ports:
+      - 6767:6767
+    networks:
+      - npm_services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bazarr.rule=Host(`bazarr.hjacke.com`)"
+      - "traefik.http.routers.bazarr.entrypoints=websecure"
+      - "traefik.http.routers.bazarr.tls=true"
+      - "traefik.http.services.bazarr.loadbalancer.server.port=6767"
     restart: unless-stopped
 
   overseerr:
@@ -33,6 +86,13 @@ services:
       - PUID=1000
       - PGID=100
       - TZ=Etc/UTC
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.overseerr-filmen.rule=Host(`filmen.hjacke.com`)"
+      - "traefik.http.routers.overseerr-filmen.entrypoints=websecure"
+      - "traefik.http.routers.overseerr-filmen.tls=true"
+      - "traefik.http.routers.overseerr-filmen.service=overseerr"
+      - "traefik.http.services.overseerr.loadbalancer.server.port=5055"
 
 networks:
   npm_services:

@@ -36,6 +36,14 @@ services:
       - trilium-ts-state:/var/lib/tailscale
     networks:
       - npm_services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.trilium.rule=Host(`trilium.hjacke.com`)"
+      - "traefik.http.routers.trilium.entrypoints=websecure"
+      - "traefik.http.routers.trilium.tls=true"
+      - "traefik.http.routers.trilium.service=trilium"
+      - "traefik.http.services.trilium.loadbalancer.server.port=8080"
+      - "traefik.http.services.trilium.loadbalancer.server.scheme=http"
     restart: unless-stopped
 
   trilium:

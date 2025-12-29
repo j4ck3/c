@@ -26,6 +26,12 @@ services:
     networks:
       - docker0
       - npm_services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.searxng.rule=Host(`searxng.hjacke.com`)"
+      - "traefik.http.routers.searxng.entrypoints=websecure"
+      - "traefik.http.routers.searxng.tls=true"
+      - "traefik.http.services.searxng.loadbalancer.server.port=8080"
 
   searxng:
     image: searxng/searxng:latest
