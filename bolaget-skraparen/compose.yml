@@ -19,14 +19,14 @@ services:
       - "traefik.docker.network=traefik"
 
   stock-scraper-api:
-    image: ghcr.io/j4ck3/stock-scraper:latest
+    image: registry.gitlab.com/j4ck3/stock-scraper:latest
     container_name: stock-scraper-api
     restart: unless-stopped
     environment:
       - NODE_ENV=production
       - PORT=5000
-      # Add your environment variables here
-      # - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      # Add your environment variables here·
+      # - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}j
       # - TELEGRAM_CHANNELID=${TELEGRAM_CHANNELID}
       # Triggiz service requires these (set to empty to skip):
       - LOGIN_URL=${LOGIN_URL:-}
