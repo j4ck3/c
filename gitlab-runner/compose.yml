@@ -30,9 +30,3 @@ volumes:
   gitlab-runner-1-docker-machine:
   gitlab-runner-2-config:
   gitlab-runner-2-docker-machine:
-
-
-
-
-
-  # gitlab-runner register  --url https://gitlab.com  --token glrt-s1aA7aWFXNDx9KTKrtgbkmc6MjBjdjBrCm86MQp0OjIKdTpqZXE0bxg.01.1j12r13o1git
