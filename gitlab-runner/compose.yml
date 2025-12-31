@@ -1,17 +1,38 @@
 services:
-  gitlab-runner:
+  gitlab-runner-1:
     image: gitlab/gitlab-runner:alpine
-    container_name: gitlab-runner
+    container_name: gitlab-runner-1
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - gitlab-runner-config:/etc/gitlab-runner
-      - gitlab-runner-docker-machine:/root/.docker/machine
+      - gitlab-runner-1-config:/etc/gitlab-runner
+      - gitlab-runner-1-docker-machine:/root/.docker/machine
     environment:
       - TZ=Sweden/Stockholm
     ports:
       - "8093:8093"
 
+  gitlab-runner-2:
+    image: gitlab/gitlab-runner:alpine
+    container_name: gitlab-runner-2
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - gitlab-runner-2-config:/etc/gitlab-runner
+      - gitlab-runner-2-docker-machine:/root/.docker/machine
+    environment:
+      - TZ=Sweden/Stockholm
+    ports:
+      - "8094:8093"
+
 volumes:
-  gitlab-runner-config:
-  gitlab-runner-docker-machine:
+  gitlab-runner-1-config:
+  gitlab-runner-1-docker-machine:
+  gitlab-runner-2-config:
+  gitlab-runner-2-docker-machine:
+
+
+
+
+
+  # gitlab-runner register  --url https://gitlab.com  --token glrt-s1aA7aWFXNDx9KTKrtgbkmc6MjBjdjBrCm86MQp0OjIKdTpqZXE0bxg.01.1j12r13o1git
