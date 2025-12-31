@@ -1,6 +1,6 @@
 services:
   bolaget-frontend:
-    image: ghcr.io/j4ck3/bolaget-skraparen:latest
+    image: registry.gitlab.com/j4ck3-group/bolaget-skraparen:latest
     container_name: bolaget-frontend
     restart: unless-stopped
     environment:
@@ -19,16 +19,12 @@ services:
       - "traefik.docker.network=traefik"
 
   stock-scraper-api:
-    image: registry.gitlab.com/j4ck3/stock-scraper:latest
+    image: registry.gitlab.com/j4ck3-group/stock-scraper:latest
     container_name: stock-scraper-api
     restart: unless-stopped
     environment:
       - NODE_ENV=production
       - PORT=5000
-      # Add your environment variables here·
-      # - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}j
-      # - TELEGRAM_CHANNELID=${TELEGRAM_CHANNELID}
-      # Triggiz service requires these (set to empty to skip):
       - LOGIN_URL=${LOGIN_URL:-}
       - NORDIC_WELLNESS_LOGIN_EMAIL=${NORDIC_WELLNESS_LOGIN_EMAIL:-}
       - NORDIC_WELLNESS_LOGIN_PASSWORD=${NORDIC_WELLNESS_LOGIN_PASSWORD:-}
