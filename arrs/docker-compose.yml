@@ -28,11 +28,11 @@ services:
     container_name: radarr
     hostname: radarr
     environment:
-      - PUID=1000
+      - PUID=99
       - PGID=100
       - TZ=Etc/UTC
     volumes:
-      - /mnt/user/appdata/binhex-radarr/config:/config
+      - /mnt/user/appdata/binhex-radarr:/config
       - /mnt/user/media/Movies:/movies
       - /mnt/user/downloads/qbitorrent:/downloads
     ports:
@@ -91,6 +91,7 @@ services:
       - "traefik.http.routers.overseerr-filmen.rule=Host(`filmen.hjacke.com`)"
       - "traefik.http.routers.overseerr-filmen.entrypoints=websecure"
       - "traefik.http.routers.overseerr-filmen.tls=true"
+      - "traefik.http.routers.overseerr-filmen.middlewares=overseerr-compress@file,overseerr-buffering@file"
       - "traefik.http.routers.overseerr-filmen.service=overseerr"
       - "traefik.http.services.overseerr.loadbalancer.server.port=5055"
 
