@@ -2,17 +2,18 @@ services:
   syncthing:
     image: lscr.io/linuxserver/syncthing:latest
     container_name: syncthing
-    hostname: syncthing
+    hostname: jacke-pc
     restart: unless-stopped
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Stockholm
     volumes:
-      - /home/jacob/appdata/syncthing/config:/config
-      - /home/jacob/syncthing:/syncthing
-      - /home/jacob/backups/trilium:/trilium
-      - /home/jacob/backups/unraid-appdata:/unraid-appdata
+      - /home/jacke/appdata/syncthing/config:/config
+      - /home/jacke/Sync:/syncthing
+      - /home/jacke/Sync/trilium:/trilium
+      - /home/jacke/Sync/unraid-appdata:/unraid-appdata
+      # zen-private will be at /syncthing/zen-private
     ports:
       - 8384:8384
       - 22000:22000/tcp

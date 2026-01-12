@@ -1,0 +1,71 @@
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun-incognito
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - 3080:8080
+      - 52000-52100:52000-52100/udp
+    volumes:
+      - /home/appdata/gluetun-z-incognito:/gluetun
+    environment:
+      - VPN_SERVICE_PROVIDER=mullvad
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
+      - SERVER_COUNTRIES=${SERVER_COUNTRIES:-Sweden}
+      - TZ=Europe/Stockholm
+    restart: unless-stopped
+
+  neko:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: neko-chromium-intel:local
+    container_name: neko-incognito
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+    devices:
+      - /dev/dri:/dev/dri
+    shm_size: "4gb"
+    environment:
+      - NEKO_SCREEN=3440x1440@60
+      - NEKO_MEMBER_PROVIDER=noauth
+      - NEKO_EPR=52000-52100
+      - NEKO_ICELITE=true
+      - NEKO_NAT1TO1=10.0.0.146
+      - NEKO_IMPLICIT_CONTROL=true
+      - NEKO_VIDEO_CODEC=h264
+      - NEKO_MAX_FPS=60
+      - NEKO_VIDEO_BITRATE=4000
+      - NEKO_HWENC=vaapi
+      - NEKO_CLIPBOARD=true
+      - NEKO_FILE_TRANSFER_ENABLED=true
+      - LIBVA_DRIVER_NAME=iHD
+      - TZ=Europe/Stockholm
+    volumes:
+      - /home/jacke/c/z-incognito/policies:/home/neko/.config/chromium/policies/managed:ro
+    tmpfs:
+      - /home/neko/.cache
+    restart: unless-stopped
+
+  inactivity-monitor:
+    image: docker:cli
+    container_name: neko-monitor
+    network_mode: service:gluetun
+    depends_on:
+      - neko
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/jacke/c/z-incognito/inactivity-monitor.sh:/monitor.sh:ro
+    entrypoint: ["/bin/sh", "/monitor.sh"]
+    restart: unless-stopped

@@ -1,0 +1,60 @@
+{
+  "ExtensionInstallForcelist": [
+    "cjpalhdlnbpafiamejdnhcphjbkeiagm;https://clients2.google.com/service/update2/crx"
+  ],
+
+  "BrowserSignin": 0,
+  "SyncDisabled": true,
+  "PromotionalTabsEnabled": false,
+  "DefaultBrowserSettingEnabled": false,
+  "RestoreOnStartup": 5,
+  "ShowHomeButton": false,
+  "BookmarkBarEnabled": false,
+
+  "ImportBookmarks": false,
+  "ImportHistory": false,
+  "ImportSavedPasswords": false,
+  "ImportSearchEngine": false,
+  "ImportAutofillFormData": false,
+
+  "DefaultNotificationsSetting": 2,
+  "DefaultGeolocationSetting": 2,
+  "DefaultPopupsSetting": 2,
+  "DefaultWebUsbGuardSetting": 2,
+  "DefaultFileSystemReadGuardSetting": 2,
+  "DefaultFileSystemWriteGuardSetting": 2,
+  "DefaultSensorsSetting": 2,
+  "DefaultSerialGuardSetting": 2,
+
+  "MetricsReportingEnabled": false,
+  "UrlKeyedAnonymizedDataCollectionEnabled": false,
+  "UserFeedbackAllowed": false,
+  "SpellCheckServiceEnabled": false,
+  "SearchSuggestEnabled": false,
+  "AlternateErrorPagesEnabled": false,
+  "NetworkPredictionOptions": 2,
+
+  "SafeBrowsingEnabled": true,
+  "BlockThirdPartyCookies": true,
+
+  "PasswordManagerEnabled": false,
+  "AutofillAddressEnabled": false,
+  "AutofillCreditCardEnabled": false,
+  "PaymentMethodQueryEnabled": false,
+
+  "TranslateEnabled": false,
+  "BackgroundModeEnabled": false,
+  "MediaRecommendationsEnabled": false,
+  "ShoppingListEnabled": false,
+  "SideSearchEnabled": false,
+  "HideWebStoreIcon": false,
+
+  "DeveloperToolsAvailability": 1,
+  "ExtensionInstallBlocklist": ["*"],
+  "ExtensionInstallAllowlist": ["cjpalhdlnbpafiamejdnhcphjbkeiagm"],
+
+  "WebRtcIPHandling": "disable_non_proxied_udp",
+  "WebRtcLocalIpsAllowedUrls": [],
+  "WebRtcEventLogCollectionAllowed": false,
+  "WebRtcAllowLegacyTLSProtocols": false
+}
