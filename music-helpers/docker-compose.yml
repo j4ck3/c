@@ -23,6 +23,23 @@ services:
     volumes:
       - /mnt/user/appdata/soulify/soulify:/app
       - /mnt/user/downloads/soulify:/downloads
-    command: [ "python", "/app/SpotWebApp.py" ]
+    command: ["python", "/app/SpotWebApp.py"]
     stdin_open: true
     tty: true
+
+  your_spotify:
+    image: lscr.io/linuxserver/your_spotify:latest
+    container_name: your_spotify
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - APP_URL=http://localhost
+      - SPOTIFY_PUBLIC=
+      - SPOTIFY_SECRET=
+      - CORS=http://localhost:80,https://localhost:443
+      - MONGO_ENDPOINT=mongodb://mongo:27017/your_spotify
+    ports:
+      - 80:80
+      - 443:443
+    restart: unless-stopped
