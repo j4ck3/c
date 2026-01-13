@@ -6,8 +6,8 @@ services:
       - RESTIC_REPOSITORY=/repo
       - RESTIC_PASSWORD=${RESTIC_PASSWORD}
     volumes:
-      # Backup repository location
-      - /mnt/user/backups/restic:/repo
+      # Backup repository location (on cache drive for performance)
+      - /mnt/cache/backups/restic:/repo
       # Source directories to backup
       - /mnt/user/appdata:/data/appdata:ro
       - /mnt/user/documents:/data/documents:ro
@@ -25,8 +25,8 @@ services:
       - MAINPC_PATH=${MAINPC_PATH:-/home/user/backups/unraid}
     volumes:
       - ./config:/config
-      # Backup repository to sync FROM
-      - /mnt/user/backups/restic:/backup:ro
+      # Backup repository to sync FROM (on cache drive)
+      - /mnt/cache/backups/restic:/backup:ro
       # Scripts
       - ./scripts:/scripts:ro
       # SSH keys for SFTP authentication
@@ -39,8 +39,8 @@ services:
       - RESTIC_REPOSITORY=/repo
       - RESTIC_PASSWORD=${RESTIC_PASSWORD}
     volumes:
-      # Backup repository
-      - /mnt/user/backups/restic:/repo
+      # Backup repository (on cache drive for performance)
+      - /mnt/cache/backups/restic:/repo
       # Source directories
       - /mnt/user/appdata:/data/appdata:ro
       - /mnt/user/documents:/data/documents:ro

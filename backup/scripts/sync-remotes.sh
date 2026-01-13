@@ -21,8 +21,23 @@ set -e
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-BACKUP_SOURCE="/mnt/user/backups/restic"
-RCLONE_CONFIG="/mnt/user/documents/compose/backup/rclone.conf"
+# Try cache path first (preferred), then user path
+if [ -d "/mnt/cache/backups/restic" ]; then
+    BACKUP_SOURCE="/mnt/cache/backups/restic"
+elif [ -d "/mnt/user/backups/restic" ]; then
+    BACKUP_SOURCE="/mnt/user/backups/restic"
+else
+    BACKUP_SOURCE="/mnt/user/backups/restic"  # Default, will fail with clear error
+fi
+
+# Try to find rclone.conf in common locations
+if [ -f "/mnt/cache/documents/compose/backup/rclone.conf" ]; then
+    RCLONE_CONFIG="/mnt/cache/documents/compose/backup/rclone.conf"
+elif [ -f "/mnt/user/documents/compose/backup/rclone.conf" ]; then
+    RCLONE_CONFIG="/mnt/user/documents/compose/backup/rclone.conf"
+else
+    RCLONE_CONFIG="/mnt/user/documents/compose/backup/rclone.conf"  # Default
+fi
 
 # Remote destinations (must match names in rclone.conf)
 ONEDRIVE_REMOTE="onedrive"
@@ -125,9 +140,17 @@ sync_to_onedrive() {
     # --fast-list: Use fewer API calls (good for large directories)
     # --transfers: Number of parallel transfers
     # --checkers: Number of parallel checkers
+    local rclone_exit=0
+    local source_path="$BACKUP_SOURCE"
+    
+    # When running via docker, the source is mounted at /backup
+    if in_docker || [[ "$rclone_cmd" == *"docker"* ]]; then
+        source_path="/backup"
+    fi
+    
     if in_docker; then
         rclone sync \
-            /backup \
+            "$source_path" \
             "${ONEDRIVE_REMOTE}:${ONEDRIVE_PATH}" \
             $dry_run_flag \
             $bwlimit \
@@ -137,10 +160,10 @@ sync_to_onedrive() {
             --progress \
             --stats 30s \
             --stats-one-line \
-            -v
+            -v || rclone_exit=$?
     else
         $rclone_cmd sync \
-            "$BACKUP_SOURCE" \
+            "$source_path" \
             "${ONEDRIVE_REMOTE}:${ONEDRIVE_PATH}" \
             $dry_run_flag \
             $bwlimit \
@@ -150,7 +173,12 @@ sync_to_onedrive() {
             --progress \
             --stats 30s \
             --stats-one-line \
-            -v
+            -v || rclone_exit=$?
+    fi
+    
+    if [ $rclone_exit -ne 0 ]; then
+        log_error "OneDrive sync failed (exit code: $rclone_exit)"
+        return $rclone_exit
     fi
     
     log_success "OneDrive sync completed"
@@ -181,9 +209,17 @@ sync_to_mainpc() {
     log_info "Destination: ${MAINPC_REMOTE}:${MAINPC_PATH}"
     
     # Use sync to mirror the backup repository
+    local rclone_exit=0
+    local source_path="$BACKUP_SOURCE"
+    
+    # When running via docker, the source is mounted at /backup
+    if in_docker || [[ "$rclone_cmd" == *"docker"* ]]; then
+        source_path="/backup"
+    fi
+    
     if in_docker; then
         rclone sync \
-            /backup \
+            "$source_path" \
             "${MAINPC_REMOTE}:${MAINPC_PATH}" \
             $dry_run_flag \
             $bwlimit \
@@ -192,10 +228,10 @@ sync_to_mainpc() {
             --progress \
             --stats 30s \
             --stats-one-line \
-            -v
+            -v || rclone_exit=$?
     else
         $rclone_cmd sync \
-            "$BACKUP_SOURCE" \
+            "$source_path" \
             "${MAINPC_REMOTE}:${MAINPC_PATH}" \
             $dry_run_flag \
             $bwlimit \
@@ -204,7 +240,12 @@ sync_to_mainpc() {
             --progress \
             --stats 30s \
             --stats-one-line \
-            -v
+            -v || rclone_exit=$?
+    fi
+    
+    if [ $rclone_exit -ne 0 ]; then
+        log_error "Main PC sync failed (exit code: $rclone_exit)"
+        return $rclone_exit
     fi
     
     log_success "Main PC sync completed"
