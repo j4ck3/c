@@ -22,8 +22,8 @@ services:
       - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./certs:/etc/traefik/certs:ro
-      - ./dynamic:/etc/traefik/dynamic:ro
+      - /mnt/user/documents/compose/traefik/certs:/etc/traefik/certs:ro
+      - /mnt/user/documents/compose/traefik/dynamic:/etc/traefik/dynamic:ro
       - /mnt/user/appdata/traefik/acme.json:/etc/traefik/acme.json
       - /mnt/user/appdata/Nginx-Proxy-Manager-Official/letsencrypt:/etc/traefik/letsencrypt:ro
     networks:

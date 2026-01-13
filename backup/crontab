@@ -1,0 +1,51 @@
+# =============================================================================
+# Backup System Crontab Configuration
+# =============================================================================
+# This file contains the cron schedule for automated backups.
+#
+# HOW TO USE:
+#
+# Option 1 - Unraid User Scripts (Recommended):
+#   1. Go to Unraid Web UI -> Settings -> User Scripts
+#   2. Add a new script named "Daily Backup"
+#   3. Paste this command:
+#      /mnt/user/documents/compose/backup/scripts/run-all-backups.sh
+#   4. Set schedule to "Custom" and use: 0 3 * * *
+#
+# Option 2 - System Crontab:
+#   Add to /etc/crontab or run: crontab -e
+#
+# =============================================================================
+
+# Cron format:
+# ┌───────────── minute (0 - 59)
+# │ ┌───────────── hour (0 - 23)
+# │ │ ┌───────────── day of month (1 - 31)
+# │ │ │ ┌───────────── month (1 - 12)
+# │ │ │ │ ┌───────────── day of week (0 - 6) (Sunday to Saturday)
+# │ │ │ │ │
+# │ │ │ │ │
+# * * * * * command
+
+# =============================================================================
+# Daily Full Backup - 3:00 AM
+# =============================================================================
+# Runs: Regular backup + VM backup + OneDrive sync + Main PC sync
+0 3 * * * /mnt/user/documents/compose/backup/scripts/run-all-backups.sh >> /mnt/user/backups/logs/cron.log 2>&1
+
+# =============================================================================
+# Alternative Schedules (uncomment to use)
+# =============================================================================
+
+# Weekly full backup (Sundays at 2:00 AM)
+# 0 2 * * 0 /mnt/user/documents/compose/backup/scripts/run-all-backups.sh
+
+# Daily backup WITHOUT VM (faster, less disruptive)
+# 0 3 * * * /mnt/user/documents/compose/backup/scripts/run-all-backups.sh --no-vm
+
+# Hourly sync-only to OneDrive (if you want more frequent cloud sync)
+# 0 * * * * cd /mnt/user/documents/compose/backup && docker compose run --rm rclone /scripts/sync-remotes.sh onedrive
+
+# VM backup only on weekends (less disruption during weekdays)
+# 0 3 * * 6,0 /mnt/user/documents/compose/backup/scripts/vm-backup.sh
+

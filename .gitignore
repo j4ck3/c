@@ -6,5 +6,7 @@ traefik/certs/
 traefik/acme/
 traefik/acme.json
 
-han-aer-i-luften
+han-aer-i-luften/*
+!han-aer-i-luften/docker-compose.yml
+
 z-incognito/gluetun/

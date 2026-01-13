@@ -1,0 +1,61 @@
+services:
+  restic:
+    image: instrumentisto/restic:latest
+    container_name: restic
+    environment:
+      - RESTIC_REPOSITORY=/repo
+      - RESTIC_PASSWORD=${RESTIC_PASSWORD}
+    volumes:
+      # Backup repository location
+      - /mnt/user/backups/restic:/repo
+      # Source directories to backup
+      - /mnt/user/appdata:/data/appdata:ro
+      - /mnt/user/documents:/data/documents:ro
+      - /mnt/user/system:/data/system:ro
+      - /mnt/user/trilium:/data/trilium:ro
+      # Cache for faster operations
+      - restic-cache:/root/.cache/restic
+
+  rclone:
+    image: rclone/rclone:latest
+    container_name: rclone
+    environment:
+      - RCLONE_CONFIG=/config/rclone.conf
+      - ONEDRIVE_PATH=${ONEDRIVE_PATH:-Backups/unraid}
+      - MAINPC_PATH=${MAINPC_PATH:-/home/user/backups/unraid}
+    volumes:
+      - ./config:/config
+      # Backup repository to sync FROM
+      - /mnt/user/backups/restic:/backup:ro
+      # Scripts
+      - ./scripts:/scripts:ro
+      # SSH keys for SFTP authentication
+      - /root/.ssh:/root/.ssh:ro
+
+  backup-runner:
+    image: instrumentisto/restic:latest
+    container_name: backup-runner
+    environment:
+      - RESTIC_REPOSITORY=/repo
+      - RESTIC_PASSWORD=${RESTIC_PASSWORD}
+    volumes:
+      # Backup repository
+      - /mnt/user/backups/restic:/repo
+      # Source directories
+      - /mnt/user/appdata:/data/appdata:ro
+      - /mnt/user/documents:/data/documents:ro
+      - /mnt/user/system:/data/system:ro
+      - /mnt/user/trilium:/data/trilium:ro
+      # Scripts
+      - ./scripts:/scripts:ro
+      # Cache
+      - restic-cache:/root/.cache/restic
+    entrypoint: ["/bin/sh"]
+    command: ["/scripts/backup.sh"]
+    profiles:
+      - backup
+
+volumes:
+  restic-cache:
+    name: restic-cache
+

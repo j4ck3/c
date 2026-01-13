@@ -1,4 +1,9 @@
 tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /etc/traefik/certs/hjacke.com-fullchain.pem
+        keyFile: /etc/traefik/certs/hjacke.com-privkey.pem
   certificates:
     # Wildcard certificate for *.hjacke.com
     - certFile: /etc/traefik/certs/hjacke.com-fullchain.pem

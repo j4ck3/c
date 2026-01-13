@@ -19,7 +19,7 @@ services:
       - npm_services
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.filebrowser.rule=Host(`browser.hjacke.com`)"
+      - "traefik.http.routers.filebrowser.rule=Host(`files.hjacke.com`)"
       - "traefik.http.routers.filebrowser.entrypoints=websecure"
       - "traefik.http.routers.filebrowser.tls=true"
       - "traefik.http.services.filebrowser.loadbalancer.server.port=80"
