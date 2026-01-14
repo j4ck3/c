@@ -50,6 +50,21 @@ Automated backup solution using **Restic** (deduplicated local backups) and **Rc
 - `/mnt/user/downloads`
 
 
+## REQUIRED SETUP.
+
+generate config with rclone. and setup envs in .env
+
+RESTIC_PASSWORD
+MAINPC_HOST
+MAINPC_USER
+MAINPC_PATH
+MAINPC_PORT
+ONEDRIVE_PATH
+VM_NAME
+TELEGRAM_ENABLED
+TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID
+
 ## Common Commands
 
 ```bash
@@ -64,7 +79,10 @@ cd /mnt/user/documents/compose/backup
 # Run backup without remote sync
 ./scripts/run-all-backups.sh --no-sync
 
+
+# cd /mnt/user/documents/compose/backup
 # List all snapshots
+
 docker compose run --rm restic snapshots
 
 # Check repository health
@@ -120,9 +138,6 @@ Restic automatically keeps:
 
 ### "Repository not found" error
 Run `docker compose run --rm restic init` to initialize.
-
-### OneDrive authentication expired
-Run `docker compose run --rm rclone config reconnect onedrive:` to re-authenticate.
 
 ### VM doesn't shut down
 Check the VM name matches exactly:
