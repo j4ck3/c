@@ -1,10 +1,46 @@
 services:
+  # Rebuilds assets when container image updates (fixes CSS 404 issues)
+  asset-builder:
+    image: frappe/erpnext:latest
+    container_name: erpnext_asset_builder
+    restart: "no"
+    volumes:
+      - sites:/home/frappe/frappe-bench/sites
+      - assets:/home/frappe/frappe-bench/sites/assets
+    entrypoint:
+      - bash
+      - -c
+    command:
+      - |
+        # Get current node path
+        NODE_PATH=$$(find /home/frappe/.nvm/versions/node -name "node" -type f 2>/dev/null | head -1)
+        NODE_DIR=$$(dirname "$$NODE_PATH")
+        export PATH="$$NODE_DIR:$$PATH"
+        
+        # Check if assets need rebuilding by testing if website.bundle CSS exists
+        EXPECTED_CSS=$$(ls /home/frappe/frappe-bench/apps/frappe/frappe/public/dist/css/website.bundle.*.css 2>/dev/null | head -1)
+        if [ -n "$$EXPECTED_CSS" ]; then
+          EXPECTED_HASH=$$(basename "$$EXPECTED_CSS" | sed 's/website.bundle.\(.*\).css/\1/')
+          CURRENT_CSS=$$(ls /home/frappe/frappe-bench/sites/assets/frappe/dist/css/website.bundle.*.css 2>/dev/null | head -1)
+          CURRENT_HASH=$$(basename "$$CURRENT_CSS" 2>/dev/null | sed 's/website.bundle.\(.*\).css/\1/')
+          
+          if [ "$$EXPECTED_HASH" != "$$CURRENT_HASH" ]; then
+            echo "Asset hash mismatch - rebuilding assets..."
+            cd /home/frappe/frappe-bench && bench build --production
+            echo "Assets rebuilt successfully"
+          else
+            echo "Assets are up to date"
+          fi
+        else
+          echo "Building assets for the first time..."
+          cd /home/frappe/frappe-bench && bench build --production
+        fi
+    networks:
+      - erpnext
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
 
-# if css fails again: 
-# cd /home/ubuntu/c/erpnext
-# docker compose up -d --force-recreate
-# docker compose exec -T frontend bash -lc 'export PATH="/home/frappe/.nvm/versions/node/v20.19.2/bin:$PATH"; bench build --production'
-# docker compose restart frontend
   configurator:
     image: frappe/erpnext:latest
     container_name: erpnext_configurator
@@ -114,6 +150,7 @@ services:
       - "traefik.http.routers.erpnext.rule=Host(`accounting.rjhdesign.se`)"
       - "traefik.http.routers.erpnext.entrypoints=websecure"
       - "traefik.http.routers.erpnext.tls=true"
+      - "traefik.http.routers.erpnext.tls.certresolver=letsencrypt"
       - "traefik.http.routers.erpnext.middlewares=erpnext-headers"
       - "traefik.http.routers.erpnext.service=erpnext-service"
       - "traefik.http.middlewares.erpnext-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
@@ -122,14 +159,19 @@ services:
       - "traefik.http.routers.erpnext-socketio.rule=Host(`accounting.rjhdesign.se`) && PathPrefix(`/socket.io`)"
       - "traefik.http.routers.erpnext-socketio.entrypoints=websecure"
       - "traefik.http.routers.erpnext-socketio.tls=true"
+      - "traefik.http.routers.erpnext-socketio.tls.certresolver=letsencrypt"
       - "traefik.http.routers.erpnext-socketio.service=erpnext-socketio-service"
       - "traefik.http.services.erpnext-socketio-service.loadbalancer.server.port=9000"
     networks:
       - erpnext
       - traefik
     depends_on:
-      - backend
-      - websocket
+      asset-builder:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
+      websocket:
+        condition: service_started
 
   websocket:
     image: frappe/erpnext:latest
