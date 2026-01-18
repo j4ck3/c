@@ -1,0 +1,140 @@
+services:
+  # Docker-in-Docker service for local development
+  dind:
+    image: docker:dind
+    container_name: devbox-dind
+    privileged: true
+    volumes:
+      - dind-storage:/var/lib/docker
+    environment:
+      - DOCKER_TLS_CERTDIR=
+    ports:
+      - "2375:2375"  # Expose DinD daemon (for debugging/management)
+    networks:
+      - devbox-network
+    restart: unless-stopped
+
+  devbox:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: devbox:local
+    container_name: devbox
+    hostname: devbox
+    depends_on:
+      - dind
+    volumes:
+      # Persistent workspace for projects
+      - devbox-workspace:/workspace
+      # Persistent home directory (dotfiles, nvim config, etc.)
+      - devbox-home:/home/dev
+      # Persistent SSH host keys (so they don't change on container restart)
+      - devbox-ssh-keys:/etc/ssh/keys
+      # Persistent SSH host keys (so they don't change on container restart)
+      - devbox-ssh-keys:/etc/ssh/keys
+      # OpenCode config and auth (Antigravity refresh tokens)
+      - ${HOME}/.config/opencode/opencode.json:/home/dev/.config/opencode/opencode.json:ro
+      - ${HOME}/.config/opencode/antigravity-accounts.json:/home/dev/.config/opencode/antigravity-accounts.json:ro
+      # SSH keys for GitHub/GitLab (optional)
+      - ${HOME}/.ssh:/home/dev/.ssh:ro
+    environment:
+      # Docker connection - default to DinD, can be overridden per session
+      - DOCKER_HOST=tcp://dind:2375
+      # Docker Hub authentication (username/password or token)
+      - DOCKER_USERNAME=${DOCKER_USERNAME:-}
+      - DOCKER_PASSWORD=${DOCKER_PASSWORD:-}
+      - DOCKER_TOKEN=${DOCKER_TOKEN:-}
+      # Private Docker registry (optional)
+      - DOCKER_REGISTRY_URL=${DOCKER_REGISTRY_URL:-}
+      - DOCKER_REGISTRY_USERNAME=${DOCKER_REGISTRY_USERNAME:-}
+      - DOCKER_REGISTRY_PASSWORD=${DOCKER_REGISTRY_PASSWORD:-}
+      # GitLab URL (for SSH authentication)
+      - GITLAB_URL=${GITLAB_URL:-gitlab.com}
+      # Auto-clone repositories (comma-separated list)
+      # Format: user/repo or git@github.com:user/repo.git or git@gitlab.com:user/repo.git
+      - AUTO_CLONE_REPOS=${AUTO_CLONE_REPOS:-}
+      # Terminal settings
+      - TERM=xterm-256color
+      - COLORTERM=truecolor
+    networks:
+      - devbox-network
+    ports:
+      # Local access without auth
+      - "7681:7681"  # Web terminal (ttyd)
+      - "2222:22"    # SSH access for local terminal
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+
+  # Remote profile - adds Traefik routing with BasicAuth
+  devbox-remote:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: devbox:local
+    container_name: devbox-remote
+    hostname: devbox-remote
+    profiles:
+      - remote
+    depends_on:
+      - dind
+    volumes:
+      - devbox-workspace:/workspace
+      - devbox-home:/home/dev
+      # OpenCode config and auth (Antigravity refresh tokens)
+      - ${HOME}/.config/opencode/opencode.json:/home/dev/.config/opencode/opencode.json:ro
+      - ${HOME}/.config/opencode/antigravity-accounts.json:/home/dev/.config/opencode/antigravity-accounts.json:ro
+      # SSH keys for GitHub/GitLab (optional)
+      - ${HOME}/.ssh:/home/dev/.ssh:ro
+    environment:
+      # Docker connection - default to DinD, can be overridden per session
+      - DOCKER_HOST=tcp://dind:2375
+      # Docker Hub authentication (username/password or token)
+      - DOCKER_USERNAME=${DOCKER_USERNAME:-}
+      - DOCKER_PASSWORD=${DOCKER_PASSWORD:-}
+      - DOCKER_TOKEN=${DOCKER_TOKEN:-}
+      # Private Docker registry (optional)
+      - DOCKER_REGISTRY_URL=${DOCKER_REGISTRY_URL:-}
+      - DOCKER_REGISTRY_USERNAME=${DOCKER_REGISTRY_USERNAME:-}
+      - DOCKER_REGISTRY_PASSWORD=${DOCKER_REGISTRY_PASSWORD:-}
+      # GitLab URL (for SSH authentication)
+      - GITLAB_URL=${GITLAB_URL:-gitlab.com}
+      # Auto-clone repositories (comma-separated list)
+      - AUTO_CLONE_REPOS=${AUTO_CLONE_REPOS:-}
+      - TERM=xterm-256color
+      - COLORTERM=truecolor
+    networks:
+      - devbox-network
+      - npm_services
+    labels:
+      - "traefik.enable=true"
+      # HTTP Router
+      - "traefik.http.routers.devbox.rule=Host(`code.hjacke.com`)"
+      - "traefik.http.routers.devbox.entrypoints=websecure"
+      - "traefik.http.routers.devbox.tls=true"
+      - "traefik.http.routers.devbox.tls.certresolver=letsencrypt"
+      # Define BasicAuth middleware via labels (uses DEVBOX_AUTH_USERS from .env)
+      - "traefik.http.middlewares.devbox-auth.basicauth.users=${DEVBOX_AUTH_USERS}"
+      # Apply BasicAuth middleware
+      - "traefik.http.routers.devbox.middlewares=devbox-auth"
+      # Service
+      - "traefik.http.services.devbox.loadbalancer.server.port=7681"
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+
+volumes:
+  devbox-workspace:
+    name: devbox-workspace
+  devbox-home:
+    name: devbox-home
+  devbox-ssh-keys:
+    name: devbox-ssh-keys
+  dind-storage:
+    name: devbox-dind-storage
+
+networks:
+  devbox-network:
+    name: devbox-network
+  npm_services:
+    external: true

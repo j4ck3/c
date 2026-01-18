@@ -25,4 +25,3 @@ http:
         memRequestBodyBytes: 2097152
         memResponseBodyBytes: 2097152
         retryExpression: "IsNetworkError() && Attempts() < 2"
-
