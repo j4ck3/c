@@ -188,7 +188,8 @@ fi
 
 # Window 4: opencode
 tmux new-window -t "$SESSION_NAME" -n "opencode" -c "$PROJECT_DIR"
-tmux send-keys -t "$SESSION_NAME:opencode" "opencode" Enter
+# Ensure TERM is set to screen-256color for tmux compatibility and opencode can access config
+tmux send-keys -t "$SESSION_NAME:opencode" "export TERM=screen-256color && export COLORTERM=truecolor && cd $PROJECT_DIR && opencode" Enter
 
 # Select the shell window first
 tmux select-window -t "$SESSION_NAME:shell"

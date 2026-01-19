@@ -13,6 +13,38 @@ if [ -w /home/dev ]; then
     cd /home/dev
 fi
 
+# Copy opencode files from staging area if they don't exist or are empty
+# This is needed because the persistent home volume overwrites /home/dev at runtime
+if [ -d /opt/opencode-staging/config ]; then
+    if [ ! -s /home/dev/.config/opencode/opencode.json ]; then
+        echo "Copying opencode configuration from staging area..."
+        mkdir -p /home/dev/.config/opencode
+        rm -rf /home/dev/.config/opencode/* 2>/dev/null || true
+        cp -r /opt/opencode-staging/config/* /home/dev/.config/opencode/
+        chown -R dev:dev /home/dev/.config/opencode
+    fi
+fi
+
+if [ -d /opt/opencode-staging/cache ]; then
+    if [ ! -s /home/dev/.cache/opencode/package.json ]; then
+        echo "Copying opencode cache from staging area..."
+        mkdir -p /home/dev/.cache/opencode
+        rm -rf /home/dev/.cache/opencode/* 2>/dev/null || true
+        cp -r /opt/opencode-staging/cache/* /home/dev/.cache/opencode/
+        chown -R dev:dev /home/dev/.cache/opencode
+    fi
+fi
+
+if [ -d /opt/opencode-staging/data ]; then
+    if [ ! -s /home/dev/.local/share/opencode/auth.json ]; then
+        echo "Copying opencode data from staging area..."
+        mkdir -p /home/dev/.local/share/opencode
+        rm -rf /home/dev/.local/share/opencode/* 2>/dev/null || true
+        cp -r /opt/opencode-staging/data/* /home/dev/.local/share/opencode/
+        chown -R dev:dev /home/dev/.local/share/opencode
+    fi
+fi
+
 # Set up auto-start tmux on SSH login (not for ttyd/browser)
 # Add to .bashrc (since .bash_profile sources .bashrc, and .bash_profile might be a symlink from dotfiles)
 # Check if the code is already there to avoid duplicates
@@ -71,6 +103,27 @@ mkdir -p /home/dev/.config/opencode
 sudo chown -R dev:dev /home/dev/.config/opencode 2>/dev/null || true
 chmod 755 /home/dev/.config/opencode 2>/dev/null || true
 
+# Pre-install opencode plugins if package.json exists to avoid runtime compilation
+if [ -f /home/dev/.config/opencode/package.json ]; then
+    echo "Pre-installing opencode plugins to avoid runtime compilation..."
+    cd /home/dev/.config/opencode
+    # Run bun install to ensure all dependencies are installed and compiled upfront
+    bun install 2>/dev/null || true
+    cd - >/dev/null 2>&1 || true
+fi
+
+# Pre-build/warm-up opencode to trigger any first-time initialization or compilation
+# This runs in background so it doesn't block container startup
+if command -v opencode >/dev/null 2>&1; then
+    echo "Pre-warming opencode to trigger initialization/compilation..."
+    # Run opencode --help in a subshell with timeout to trigger initialization
+    # Redirect output to /dev/null to avoid cluttering logs
+    (cd /tmp && timeout 30 opencode --help >/dev/null 2>&1 || true) &
+    OPENCODE_WARMUP_PID=$!
+    # Don't wait for it to complete - let it run in background
+    echo "Opencode warm-up started (PID: $OPENCODE_WARMUP_PID)"
+fi
+
 # Configure opencode with environment variables if provided
 if [ -n "$OPENCODE_GOOGLE_API_KEY" ] || [ -n "$OPENCODE_ANTHROPIC_API_KEY" ]; then
     echo "Configuring opencode API keys..."
@@ -85,6 +138,22 @@ EOF
     fi
 fi
 
+# Fix opencode.json to use specific plugin versions instead of @latest
+# This prevents Bun from trying to resolve/install at runtime (which can crash)
+if [ -f /home/dev/.config/opencode/opencode.json ]; then
+    # Check if opencode.json has @latest and replace with installed version
+    if grep -q "opencode-antigravity-auth@latest" /home/dev/.config/opencode/opencode.json 2>/dev/null; then
+        echo "Fixing opencode.json: pinning plugin versions to avoid runtime resolution..."
+        cd /home/dev/.config/opencode
+        # Use jq to replace @latest with 1.3.0 (or get from package.json)
+        INSTALLED_VERSION=$(grep -o '"opencode-antigravity-auth": "[^"]*"' package.json 2>/dev/null | grep -o '[0-9.]*' | head -1 || echo "1.3.0")
+        if command -v jq >/dev/null 2>&1; then
+            jq --arg version "$INSTALLED_VERSION" 'if .plugin then .plugin = [.plugin[] | if contains("@latest") then sub("@latest"; "@\($version)") else . end] else . end' opencode.json > opencode.json.tmp && mv opencode.json.tmp opencode.json 2>/dev/null || true
+        fi
+        cd - >/dev/null 2>&1 || true
+    fi
+fi
+
 # Ensure workspace directory exists and is writable
 if [ ! -d /workspace ]; then
     sudo mkdir -p /workspace 2>/dev/null || true
@@ -96,8 +165,6 @@ if [ -d /workspace ] && [ ! -w /workspace ]; then
     sudo chown -R dev:dev /workspace 2>/dev/null || true
 fi
 
-# Set default DOCKER_HOST to DinD (can be overridden per session)
-export DOCKER_HOST="${DOCKER_HOST:-tcp://dind:2375}"
 
 # Wait for Docker daemon to be ready (DinD)
 echo "Waiting for Docker daemon to be ready..."
@@ -112,21 +179,6 @@ for i in {1..30}; do
         sleep 1
     fi
 done
-
-# Auto-login to Docker registries
-if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
-    echo "Logging in to Docker Hub..."
-    echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin 2>/dev/null && echo "  Docker Hub login successful" || echo "  Warning: Docker Hub login failed"
-elif [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_TOKEN" ]; then
-    echo "Logging in to Docker Hub with token..."
-    echo "$DOCKER_TOKEN" | docker login -u "$DOCKER_USERNAME" --password-stdin 2>/dev/null && echo "  Docker Hub login successful" || echo "  Warning: Docker Hub login failed"
-fi
-
-# Auto-login to private Docker registries if specified
-if [ -n "$DOCKER_REGISTRY_URL" ] && [ -n "$DOCKER_REGISTRY_USERNAME" ] && [ -n "$DOCKER_REGISTRY_PASSWORD" ]; then
-    echo "Logging in to private Docker registry: $DOCKER_REGISTRY_URL..."
-    echo "$DOCKER_REGISTRY_PASSWORD" | docker login "$DOCKER_REGISTRY_URL" -u "$DOCKER_REGISTRY_USERNAME" --password-stdin 2>/dev/null && echo "  Private registry login successful" || echo "  Warning: Private registry login failed"
-fi
 
 # Configure Git to use SSH for GitHub and GitLab
 git config --global url."git@github.com:".insteadOf "https://github.com/" 2>/dev/null || true
@@ -193,52 +245,6 @@ else
     echo "  Mount your SSH keys by ensuring ~/.ssh exists on host and is mounted to the container."
 fi
 
-# Auto-clone repositories if specified
-if [ -n "$AUTO_CLONE_REPOS" ]; then
-    echo "Auto-cloning repositories..."
-    IFS=',' read -ra REPOS <<< "$AUTO_CLONE_REPOS"
-    for repo in "${REPOS[@]}"; do
-        repo=$(echo "$repo" | xargs) # Trim whitespace
-        if [ -z "$repo" ]; then
-            continue
-        fi
-        
-        # Extract repo name from URL/path
-        if [[ "$repo" == *"github.com"* ]] || [[ "$repo" == *"gitlab.com"* ]] || [[ "$repo" == *"$GITLAB_URL"* ]] || [[ "$repo" == *"@"* ]]; then
-            # Full URL: git@github.com:user/repo.git or git@gitlab.com:user/repo.git
-            REPO_NAME=$(basename "$repo" .git)
-        elif [[ "$repo" == *"/"* ]]; then
-            # Short format: user/repo
-            REPO_NAME=$(basename "$repo" .git)
-            # Convert to SSH URL - check if it looks like GitLab format first
-            if [[ "$repo" == *"$GITLAB_URL"* ]] || [[ "$repo" == gitlab.com* ]]; then
-                repo="git@${GITLAB_URL}:${repo}.git"
-            elif [[ "$repo" != git@* ]] && [[ "$repo" != https://* ]]; then
-                # Assume GitHub if no protocol or GitLab indicator
-                repo="git@github.com:${repo}.git"
-            fi
-        else
-            REPO_NAME="$repo"
-        fi
-        
-        TARGET_DIR="/workspace/$REPO_NAME"
-        
-        # Skip if already cloned
-        if [ -d "$TARGET_DIR/.git" ]; then
-            echo "  $REPO_NAME already exists, skipping..."
-            continue
-        fi
-        
-        # Clone the repository
-        echo "  Cloning $repo to $TARGET_DIR..."
-        if git clone "$repo" "$TARGET_DIR" 2>/dev/null; then
-            echo "    ✓ Successfully cloned $REPO_NAME"
-        else
-            echo "    ✗ Failed to clone $repo (check SSH keys or URL)"
-        fi
-    done
-fi
-
 # Create a sample project if workspace is empty
 if [ -z "$(ls -A /workspace 2>/dev/null)" ] && [ -w /workspace ] 2>/dev/null; then
     echo "Creating sample project..."
@@ -270,9 +276,78 @@ EOF
     fi
 fi
 
-# Ensure opencode is installed (should be installed via AUR, but check anyway)
-if ! command -v opencode >/dev/null 2>&1; then
-    echo "Warning: opencode not found (should be installed via AUR package opencode-bin)"
+# Install opencode-ai using official installer script (if not already installed)
+# This runs after persistent volumes are mounted, so installation persists
+# Check if official installer version exists, not just any opencode command
+if [ ! -f /home/dev/.opencode/bin/opencode ]; then
+    echo "Installing opencode-ai using official installer..."
+    # Remove old bun-installed opencode first so installer doesn't detect it
+    rm -f /home/dev/.bun/bin/opencode 2>/dev/null || true
+    # Temporarily remove from PATH so installer doesn't detect old version
+    OLD_PATH="$PATH"
+    export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    # Run installer (show full output for debugging)
+    curl -fsSL https://opencode.ai/install | bash || echo "Warning: opencode installer failed"
+    # Restore PATH and add .opencode/bin
+    export PATH="/home/dev/.opencode/bin:$OLD_PATH"
+    # Ensure ownership
+    chown -R dev:dev /home/dev/.opencode 2>/dev/null || true
+    echo "Opencode installation complete"
+else
+    echo "Opencode already installed via official installer"
+    # Ensure .opencode/bin is in PATH
+    export PATH="/home/dev/.opencode/bin:$PATH"
+fi
+
+# Configure and start Tailscale (if auth key provided)
+if [ -n "$TAILSCALE_AUTH_KEY" ]; then
+    echo "Configuring Tailscale..."
+    
+    # Create Tailscale state directory (persistent across restarts)
+    sudo mkdir -p /var/lib/tailscale 2>/dev/null || true
+    sudo chmod 755 /var/lib/tailscale 2>/dev/null || true
+    
+    # Start tailscaled in userspace-networking mode (works in containers without host network)
+    # This allows Tailscale to work in Docker containers
+    if ! pgrep -f tailscaled >/dev/null 2>&1; then
+        echo "Starting Tailscale daemon..."
+        # Use userspace-networking mode for container compatibility
+        # --tun=userspace-networking: Use userspace networking instead of TUN device
+        # --state: Persistent state file location
+        # Create log file with proper permissions
+        sudo touch /var/log/tailscaled.log
+        sudo chmod 666 /var/log/tailscaled.log
+        sudo tailscaled --state=/var/lib/tailscale/tailscaled.state --tun=userspace-networking >>/var/log/tailscaled.log 2>&1 &
+        TAILSCALED_PID=$!
+        sleep 3
+        
+        # Authenticate with provided auth key
+        echo "Authenticating Tailscale..."
+        sudo tailscale up \
+            --authkey="$TAILSCALE_AUTH_KEY" \
+            --accept-routes=false \
+            --accept-dns=false \
+            --hostname=devbox \
+            2>&1 | tee -a /var/log/tailscaled.log || echo "Warning: Tailscale authentication failed"
+        
+        # Wait a moment for connection
+        sleep 2
+        
+        # Show Tailscale status
+        echo "Tailscale status:"
+        sudo tailscale status 2>&1 | head -10 || echo "Tailscale connecting..."
+        
+        # Test connectivity to Tailscale hosts
+        echo "Testing Tailscale connectivity..."
+        ping -c 1 -W 2 100.109.213.78 >/dev/null 2>&1 && echo "  ✓ tower (100.109.213.78) reachable" || echo "  ✗ tower (100.109.213.78) not reachable"
+        ping -c 1 -W 2 100.71.3.26 >/dev/null 2>&1 && echo "  ✓ instance (100.71.3.26) reachable" || echo "  ✗ instance (100.71.3.26) not reachable"
+    else
+        echo "Tailscale daemon already running"
+        sudo tailscale status 2>&1 | head -5 || echo "Tailscale status unavailable"
+    fi
+else
+    echo "Tailscale not configured (TAILSCALE_AUTH_KEY not set)"
+    echo "  To enable Tailscale, set TAILSCALE_AUTH_KEY in your .env file"
 fi
 
 # Configure and start SSH server for local terminal access

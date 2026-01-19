@@ -10,5 +10,7 @@ han-aer-i-luften/*
 !han-aer-i-luften/docker-compose.yml
 
 z-incognito/gluetun/
-
 backup/config/rclone.conf
+opencode-config/
+opencode-cache/
+opencode-data/

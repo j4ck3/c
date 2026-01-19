@@ -39,13 +39,16 @@ RUN pacman -Syu --noconfirm && \
     # Node.js ecosystem
     nodejs \
     npm \
-    # Docker CLI
+    # Docker CLI and Compose
     docker \
+    docker-compose \
     # ttyd for web terminal
     ttyd \
     # Python (often needed)
     python \
-    python-pip && \
+    python-pip \
+    # Tailscale for accessing remote Docker hosts
+    tailscale && \
     # Clean up
     pacman -Scc --noconfirm
 
@@ -90,8 +93,10 @@ ENV BUN_INSTALL="/home/dev/.bun"
 RUN curl -fsSL https://bun.sh/install | BUN_INSTALL="/home/dev/.bun" bash
 ENV PATH="/home/dev/.bun/bin:$PATH"
 
-# Install opencode-ai via bun
-RUN /home/dev/.bun/bin/bun add -g opencode-ai
+# Note: opencode-ai will be installed via official installer in entrypoint.sh
+# This ensures it's installed after the persistent volume is mounted
+# Ensure .opencode/bin comes before .bun/bin in PATH so official installer version is used
+ENV PATH="/home/dev/.opencode/bin:/home/dev/.bun/bin:$PATH"
 
 # Clone dotfiles repo
 RUN git clone https://github.com/j4ck3/dotfiles /home/dev/.dotfiles
@@ -107,11 +112,17 @@ USER root
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 COPY --chmod=755 new-session.sh /usr/local/bin/new-session.sh
 
+# Copy opencode configuration to staging area (will be copied to final location by entrypoint)
+# This is needed because the persistent home volume overwrites /home/dev at runtime
+COPY --chown=dev:dev opencode-config /opt/opencode-staging/config
+COPY --chown=dev:dev opencode-cache /opt/opencode-staging/cache
+COPY --chown=dev:dev opencode-data /opt/opencode-staging/data
+
 # Set ownership
 RUN chown -R dev:dev /home/dev
 
-# Expose ttyd port
-EXPOSE 7681
+# Expose ttyd port (7681) and SSH port (22)
+EXPOSE 7681 22
 
 # Set working directory
 WORKDIR /workspace
