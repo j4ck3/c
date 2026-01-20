@@ -32,6 +32,8 @@ services:
       - devbox-ssh-keys:/etc/ssh/keys
       # SSH keys for GitHub/GitLab (optional)
       - ${HOME}/.ssh:/home/dev/.ssh:ro
+      - ./entrypoint.sh:/entrypoint.sh:ro
+      - ./new-session.sh:/usr/local/bin/new-session.sh:ro
     environment:
       - TERM=xterm-256color
       - COLORTERM=truecolor
@@ -64,6 +66,8 @@ services:
       - devbox-home:/home/dev
       # SSH keys for GitHub/GitLab (optional)
       - ${HOME}/.ssh:/home/dev/.ssh:ro
+      - ./entrypoint.sh:/entrypoint.sh:ro
+      - ./new-session.sh:/usr/local/bin/new-session.sh:ro
     environment:
       - DOCKER_HOST=tcp://dind:2375
       - TERM=xterm-256color

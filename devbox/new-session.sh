@@ -2,15 +2,6 @@
 # new-session.sh - Creates a new tmux session with project selection
 # Called by ttyd for each new browser connection
 
-# Debug logging
-DEBUG_LOG="/tmp/new-session-debug-$$.log"
-exec 2> >(tee -a "$DEBUG_LOG")
-echo "=== Session started at $(date) ===" >> "$DEBUG_LOG"
-echo "PID: $$" >> "$DEBUG_LOG"
-
-# Trap to log on exit
-trap 'echo "=== Script exiting with code $? at line $LINENO ===" >> "$DEBUG_LOG"; echo "Last command: $BASH_COMMAND" >> "$DEBUG_LOG"' EXIT
-
 set -e
 
 # Colors for output
@@ -18,6 +9,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${CYAN}"
@@ -138,15 +130,41 @@ else
     if [[ "$DOCKER_NAME" == "Docker-in-Docker (Local)" ]]; then
         DOCKER_HOST="$DOCKER_ENDPOINT"
         DOCKER_CONTEXT=""
-    else
-        # Use Docker context
-        DOCKER_CONTEXT="$DOCKER_NAME"
-        DOCKER_HOST=""
-    fi
-    
-    echo -e "${GREEN}Selected: ${DOCKER_NAME}${NC}"
-    if [ -n "$DOCKER_ENDPOINT" ] && [ "$DOCKER_ENDPOINT" != "N/A" ]; then
+        echo -e "${GREEN}Selected: ${DOCKER_NAME}${NC}"
         echo -e "${BLUE}Endpoint: ${DOCKER_ENDPOINT}${NC}"
+    else
+        # Use Docker context endpoint via DOCKER_HOST (per-session, not global)
+        # Always extract endpoint directly from context name for reliability
+        echo -e "${GREEN}Selected context: ${DOCKER_NAME}${NC}"
+        echo -e "${CYAN}Extracting endpoint from context...${NC}"
+        
+        # Try to get endpoint from the context
+        echo -e "${CYAN}Inspecting context '$DOCKER_NAME'...${NC}"
+        EXTRACTED_ENDPOINT=$(docker context inspect "$DOCKER_NAME" --format '{{.Endpoints.docker.Host}}' 2>/dev/null || echo "")
+        echo -e "${CYAN}  Extracted endpoint: '${EXTRACTED_ENDPOINT}'${NC}"
+        echo -e "${CYAN}  Endpoint from selection: '${DOCKER_ENDPOINT}'${NC}"
+        
+        # Use extracted endpoint if valid, otherwise fall back to endpoint from selection list
+        if [ -n "$EXTRACTED_ENDPOINT" ] && [ "$EXTRACTED_ENDPOINT" != "N/A" ] && [ "$EXTRACTED_ENDPOINT" != "<no value>" ] && [ "$EXTRACTED_ENDPOINT" != "" ]; then
+            DOCKER_HOST="$EXTRACTED_ENDPOINT"
+            echo -e "${BLUE}✓ Using endpoint extracted from context: ${EXTRACTED_ENDPOINT}${NC}"
+        elif [ -n "$DOCKER_ENDPOINT" ] && [ "$DOCKER_ENDPOINT" != "N/A" ] && [ "$DOCKER_ENDPOINT" != "<no value>" ] && [ "$DOCKER_ENDPOINT" != "" ]; then
+            echo -e "${YELLOW}⚠ Using endpoint from selection list: ${DOCKER_ENDPOINT}${NC}"
+            DOCKER_HOST="$DOCKER_ENDPOINT"
+        else
+            echo -e "${RED}✗ ERROR: Could not extract endpoint from context '$DOCKER_NAME'${NC}"
+            echo -e "${RED}  Extracted: '${EXTRACTED_ENDPOINT}'${NC}"
+            echo -e "${RED}  From selection: '${DOCKER_ENDPOINT}'${NC}"
+            echo -e "${RED}  Falling back to default Docker-in-Docker${NC}"
+            DOCKER_HOST="tcp://dind:2375"
+        fi
+        
+        # Ensure DOCKER_HOST uses tcp:// protocol
+        if [[ ! "$DOCKER_HOST" =~ ^tcp:// ]] && [[ ! "$DOCKER_HOST" =~ ^unix:// ]] && [[ ! "$DOCKER_HOST" =~ ^ssh:// ]]; then
+            DOCKER_HOST="tcp://${DOCKER_HOST#tcp://}"
+        fi
+        
+        DOCKER_CONTEXT=""
     fi
 fi
 
@@ -159,12 +177,23 @@ echo -e "${GREEN}Starting session: ${SESSION_NAME}${NC}"
 echo -e "${BLUE}Project directory: ${PROJECT_DIR}${NC}"
 
 # Determine Docker connection settings
-if [ -n "$DOCKER_HOST" ]; then
-    # Use DOCKER_HOST environment variable
-    export DOCKER_HOST
-else
-    # Use Docker context
-    export DOCKER_CONTEXT
+# Always use DOCKER_HOST environment variable (per-session, not global)
+if [ -z "$DOCKER_HOST" ]; then
+    DOCKER_HOST="tcp://dind:2375"
+fi
+export DOCKER_HOST
+
+# Debug: Show which Docker endpoint will be used
+echo -e "${CYAN}═══════════════════════════════════════${NC}"
+echo -e "${CYAN}Docker Configuration:${NC}"
+echo -e "${CYAN}  DOCKER_HOST will be set to: ${DOCKER_HOST}${NC}"
+echo -e "${CYAN}═══════════════════════════════════════${NC}"
+echo ""
+
+# Verify DOCKER_HOST is set correctly before proceeding
+if [ -z "$DOCKER_HOST" ]; then
+    echo -e "${RED}ERROR: DOCKER_HOST is empty!${NC}"
+    exit 1
 fi
 
 # Ensure TERM is set to a valid value for tmux (fixes "xterm-ghostty" issue)
@@ -175,34 +204,94 @@ fi
 
 # Create tmux session with windows
 # Window 0: shell
-if [ -n "$DOCKER_HOST" ]; then
-    tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_DIR" -n "shell" -e "DOCKER_HOST=$DOCKER_HOST" -e "TERM=$TERM"
-else
-    tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_DIR" -n "shell" -e "TERM=$TERM"
-    # Set Docker context
-    docker context use "$DOCKER_CONTEXT" 2>/dev/null || true
+# Always use DOCKER_HOST environment variable (per-session, not global)
+# Set DOCKER_HOST in tmux environment AND ensure it's exported in shell
+tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_DIR" -n "shell" \
+    -e "DOCKER_HOST=$DOCKER_HOST" \
+    -e "DOCKER_CONTEXT=" \
+    -e "TERM=$TERM"
+
+# Set DOCKER_HOST in shell window and show connection info
+# Use a more persistent method: create a .docker_env file and source it
+# IMPORTANT: Switch to "default" context so Docker uses DOCKER_HOST instead of active context
+DOCKER_ENV_FILE="/tmp/docker_env_${SESSION_NAME}.sh"
+cat > "$DOCKER_ENV_FILE" << 'ENVEOF'
+# Docker environment for session - switch to default context first
+# This ensures Docker uses DOCKER_HOST instead of active context
+docker context use default >/dev/null 2>&1 || true
+ENVEOF
+cat >> "$DOCKER_ENV_FILE" << EOF
+# Set DOCKER_HOST - this takes precedence over context
+# IMPORTANT: DOCKER_HOST must be set BEFORE any docker commands
+export DOCKER_HOST='$DOCKER_HOST'
+unset DOCKER_CONTEXT
+# Verify DOCKER_HOST is set correctly
+if [ -z "\$DOCKER_HOST" ]; then
+    echo "ERROR: DOCKER_HOST is not set!" >&2
+    exit 1
 fi
+# Switch to default context to avoid conflicts (DOCKER_HOST will still take precedence)
+docker context use default >/dev/null 2>&1 || true
+EOF
+chmod 644 "$DOCKER_ENV_FILE"
+
+# Source the env file in shell and show connection info
+# Add to .bashrc to ensure it's sourced on every new shell in this session
+BASHRC_SESSION_FILE="$HOME/.bashrc_session_${SESSION_NAME}"
+echo "source '$DOCKER_ENV_FILE'" > "$BASHRC_SESSION_FILE"
+if ! grep -q "source.*bashrc_session_${SESSION_NAME}" ~/.bashrc 2>/dev/null; then
+    echo "[ -f \"$BASHRC_SESSION_FILE\" ] && source \"$BASHRC_SESSION_FILE\"" >> ~/.bashrc 2>/dev/null || true
+fi
+
+# Create a docker wrapper function to ensure DOCKER_HOST is always set
+# This ensures DOCKER_HOST is set even if the env file wasn't sourced
+DOCKER_WRAPPER_FILE="/tmp/docker_wrapper_${SESSION_NAME}.sh"
+cat > "$DOCKER_WRAPPER_FILE" << EOF
+# Docker wrapper to ensure DOCKER_HOST is always set
+docker() {
+    # Source the env file if DOCKER_HOST is not set
+    if [ -z "\$DOCKER_HOST" ] && [ -f "$DOCKER_ENV_FILE" ]; then
+        source "$DOCKER_ENV_FILE" 2>/dev/null || true
+    fi
+    # Call the real docker command
+    command docker "\$@"
+}
+EOF
+chmod 644 "$DOCKER_WRAPPER_FILE"
+# Add wrapper to .bashrc so it's available in all shells
+if ! grep -q "source.*docker_wrapper_${SESSION_NAME}" ~/.bashrc 2>/dev/null; then
+    echo "source '$DOCKER_WRAPPER_FILE' 2>/dev/null || true" >> ~/.bashrc 2>/dev/null || true
+fi
+
+# Create initialization script to set up Docker environment (silently)
+DOCKER_INIT_SCRIPT="/tmp/docker_init_${SESSION_NAME}.sh"
+cat > "$DOCKER_INIT_SCRIPT" << EOF
+#!/bin/bash
+# Initialize Docker environment
+source '$DOCKER_ENV_FILE' 2>/dev/null || true
+source '$DOCKER_WRAPPER_FILE' 2>/dev/null || true
+EOF
+chmod +x "$DOCKER_INIT_SCRIPT"
+
+# Execute the initialization script silently
+tmux send-keys -t "$SESSION_NAME:shell" "$DOCKER_INIT_SCRIPT" Enter
 
 # Window 1: nvim
 tmux new-window -t "$SESSION_NAME" -n "nvim" -c "$PROJECT_DIR"
-tmux send-keys -t "$SESSION_NAME:nvim" "nvim ." Enter
+tmux send-keys -t "$SESSION_NAME:nvim" "source '$DOCKER_ENV_FILE' && nvim ." Enter
 
 # Window 2: lazygit
 tmux new-window -t "$SESSION_NAME" -n "lazygit" -c "$PROJECT_DIR"
-tmux send-keys -t "$SESSION_NAME:lazygit" "lazygit" Enter
+tmux send-keys -t "$SESSION_NAME:lazygit" "source '$DOCKER_ENV_FILE' && lazygit" Enter
 
 # Window 3: lazydocker
 tmux new-window -t "$SESSION_NAME" -n "lazydocker"
-if [ -n "$DOCKER_ENV" ]; then
-    tmux send-keys -t "$SESSION_NAME:lazydocker" "export $DOCKER_ENV && lazydocker" Enter
-else
-    tmux send-keys -t "$SESSION_NAME:lazydocker" "lazydocker" Enter
-fi
+tmux send-keys -t "$SESSION_NAME:lazydocker" "source '$DOCKER_ENV_FILE' && lazydocker" Enter
 
 # Window 4: opencode
 tmux new-window -t "$SESSION_NAME" -n "opencode" -c "$PROJECT_DIR"
 # Ensure TERM is set to screen-256color for tmux compatibility and opencode can access config
-tmux send-keys -t "$SESSION_NAME:opencode" "export TERM=screen-256color && export COLORTERM=truecolor && cd $PROJECT_DIR && opencode" Enter
+tmux send-keys -t "$SESSION_NAME:opencode" "source '$DOCKER_ENV_FILE' && export TERM=screen-256color && export COLORTERM=truecolor && cd '$PROJECT_DIR' && opencode" Enter
 
 # Select the shell window first
 tmux select-window -t "$SESSION_NAME:shell"

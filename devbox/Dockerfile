@@ -60,6 +60,12 @@ RUN curl -fsSL https://bun.sh/install | bash
 ENV BUN_INSTALL="/root/.bun"
 ENV PATH="$BUN_INSTALL/bin:$PATH"
 
+# Install cursor-agent for opencode-cursor-auth plugin
+# cursor-agent is typically installed to ~/.cursor/bin or /usr/local/bin
+RUN curl -fsS https://cursor.com/install | bash || echo "Warning: cursor-agent installation failed (may need manual install)"
+# Add cursor-agent to PATH (common installation locations)
+ENV PATH="/root/.cursor/bin:/home/dev/.cursor/bin:/usr/local/bin:$PATH"
+
 # Install lazygit from GitHub releases
 RUN LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | jq -r '.tag_name' | sed 's/v//') && \
     curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" && \
@@ -93,10 +99,15 @@ ENV BUN_INSTALL="/home/dev/.bun"
 RUN curl -fsSL https://bun.sh/install | BUN_INSTALL="/home/dev/.bun" bash
 ENV PATH="/home/dev/.bun/bin:$PATH"
 
+# Install cursor-agent for dev user (needed for opencode-cursor-auth plugin)
+# cursor-agent installer typically installs to ~/.local/bin
+RUN curl -fsS https://cursor.com/install | bash || echo "Warning: cursor-agent installation failed (may need manual install)"
+
 # Note: opencode-ai will be installed via official installer in entrypoint.sh
 # This ensures it's installed after the persistent volume is mounted
 # Ensure .opencode/bin comes before .bun/bin in PATH so official installer version is used
-ENV PATH="/home/dev/.opencode/bin:/home/dev/.bun/bin:$PATH"
+# Also ensure cursor-agent is in PATH (~/.local/bin is where installer puts it)
+ENV PATH="/home/dev/.opencode/bin:/home/dev/.local/bin:/home/dev/.cursor/bin:/home/dev/.bun/bin:/usr/local/bin:$PATH"
 
 # Clone dotfiles repo
 RUN git clone https://github.com/j4ck3/dotfiles /home/dev/.dotfiles

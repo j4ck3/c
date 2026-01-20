@@ -276,6 +276,42 @@ EOF
     fi
 fi
 
+# Install cursor-agent if not already installed (needed for opencode-cursor-auth plugin)
+if ! command -v cursor-agent >/dev/null 2>&1; then
+    echo "Installing cursor-agent..."
+    curl -fsS https://cursor.com/install | bash || echo "Warning: cursor-agent installation failed"
+    # Add cursor-agent to PATH if installed (check common locations)
+    # cursor-agent installer typically installs to ~/.local/bin
+    if [ -d "$HOME/.local/bin" ]; then
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
+    if [ -d "/home/dev/.local/bin" ]; then
+        export PATH="/home/dev/.local/bin:$PATH"
+    fi
+    if [ -d "$HOME/.cursor/bin" ]; then
+        export PATH="$HOME/.cursor/bin:$PATH"
+    fi
+    if [ -d "/home/dev/.cursor/bin" ]; then
+        export PATH="/home/dev/.cursor/bin:$PATH"
+    fi
+    if [ -d "/usr/local/bin" ] && [ -f "/usr/local/bin/cursor-agent" ]; then
+        export PATH="/usr/local/bin:$PATH"
+    fi
+    # Verify installation
+    if command -v cursor-agent >/dev/null 2>&1; then
+        echo "  ✓ cursor-agent installed successfully at $(which cursor-agent)"
+    else
+        echo "  ⚠ Warning: cursor-agent not found in PATH after installation"
+        echo "  Checking common locations..."
+        ls -la ~/.local/bin/cursor-agent 2>/dev/null || echo "    Not in ~/.local/bin"
+        ls -la ~/.cursor/bin/cursor-agent 2>/dev/null || echo "    Not in ~/.cursor/bin"
+        ls -la /usr/local/bin/cursor-agent 2>/dev/null || echo "    Not in /usr/local/bin"
+        echo "  You may need to install it manually: curl -fsS https://cursor.com/install | bash"
+    fi
+else
+    echo "cursor-agent already installed at $(which cursor-agent)"
+fi
+
 # Install opencode-ai using official installer script (if not already installed)
 # This runs after persistent volumes are mounted, so installation persists
 # Check if official installer version exists, not just any opencode command
@@ -288,16 +324,38 @@ if [ ! -f /home/dev/.opencode/bin/opencode ]; then
     export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     # Run installer (show full output for debugging)
     curl -fsSL https://opencode.ai/install | bash || echo "Warning: opencode installer failed"
-    # Restore PATH and add .opencode/bin
-    export PATH="/home/dev/.opencode/bin:$OLD_PATH"
+    # Restore PATH and add .opencode/bin and cursor-agent
+    export PATH="/home/dev/.opencode/bin:/home/dev/.local/bin:/home/dev/.cursor/bin:$OLD_PATH"
     # Ensure ownership
     chown -R dev:dev /home/dev/.opencode 2>/dev/null || true
     echo "Opencode installation complete"
 else
     echo "Opencode already installed via official installer"
-    # Ensure .opencode/bin is in PATH
-    export PATH="/home/dev/.opencode/bin:$PATH"
+    # Ensure .opencode/bin and cursor-agent are in PATH
+    export PATH="/home/dev/.opencode/bin:/home/dev/.local/bin:/home/dev/.cursor/bin:$PATH"
 fi
+
+# Ensure cursor-agent is in PATH for all sessions
+# cursor-agent installer typically installs to ~/.local/bin
+# Add to both .bashrc and .bash_profile for maximum compatibility
+if ! grep -q "\.local/bin" /home/dev/.bashrc 2>/dev/null; then
+    echo "" >> /home/dev/.bashrc
+    echo "# Add cursor-agent to PATH (installed to ~/.local/bin)" >> /home/dev/.bashrc
+    echo 'export PATH="$HOME/.local/bin:$HOME/.cursor/bin:$PATH"' >> /home/dev/.bashrc
+    chown dev:dev /home/dev/.bashrc 2>/dev/null || true
+fi
+
+# Also add to .bash_profile (sourced by login shells)
+if [ ! -f /home/dev/.bash_profile ]; then
+    echo 'export PATH="$HOME/.local/bin:$HOME/.cursor/bin:$PATH"' > /home/dev/.bash_profile
+    chown dev:dev /home/dev/.bash_profile 2>/dev/null || true
+elif ! grep -q "\.local/bin" /home/dev/.bash_profile 2>/dev/null; then
+    echo 'export PATH="$HOME/.local/bin:$HOME/.cursor/bin:$PATH"' >> /home/dev/.bash_profile
+    chown dev:dev /home/dev/.bash_profile 2>/dev/null || true
+fi
+
+# Ensure PATH is set in current environment for opencode
+export PATH="/home/dev/.local/bin:/home/dev/.cursor/bin:$PATH"
 
 # Configure and start Tailscale (if auth key provided)
 if [ -n "$TAILSCALE_AUTH_KEY" ]; then
@@ -391,7 +449,22 @@ chown -R dev:dev /home/dev/.ssh-local 2>/dev/null || true
 
 # Configure SSH to use the writable authorized_keys location
 sudo mkdir -p /etc/ssh/sshd_config.d 2>/dev/null || true
-echo "AuthorizedKeysFile /home/dev/.ssh-local/authorized_keys /home/dev/.ssh/authorized_keys" | sudo tee /etc/ssh/sshd_config.d/devbox.conf > /dev/null 2>&1 || true
+cat > /tmp/sshd_devbox.conf << 'EOF'
+AuthorizedKeysFile /home/dev/.ssh-local/authorized_keys /home/dev/.ssh/authorized_keys
+# Increase connection limits to handle rapid connection attempts
+# Format: start:rate:full (allow 20 concurrent, rate limit after 10, max 50)
+MaxStartups 20:10:50
+MaxSessions 20
+# Reduce connection timeout to fail faster if there's an issue
+LoginGraceTime 30
+# Keep connections alive
+ClientAliveInterval 60
+ClientAliveCountMax 3
+# Increase TCP keepalive to prevent connection resets
+TCPKeepAlive yes
+EOF
+sudo cp /tmp/sshd_devbox.conf /etc/ssh/sshd_config.d/devbox.conf
+sudo chmod 644 /etc/ssh/sshd_config.d/devbox.conf
 
 # Set dev user password to empty (allows SSH key auth)
 # For password auth, user can set password manually: docker exec -it devbox sudo passwd dev
@@ -401,8 +474,21 @@ echo "Starting SSH server on port 22..."
 sudo /usr/bin/sshd -D -e 2>&1 &
 SSH_PID=$!
 
-# Wait a moment for SSH to start
-sleep 2
+# Wait for SSH to be ready and verify it's listening
+echo "Waiting for SSH server to be ready..."
+for i in {1..20}; do
+    if sudo netstat -tlnp 2>/dev/null | grep -q ":22.*LISTEN" || ss -tlnp 2>/dev/null | grep -q ":22"; then
+        echo "  SSH server is ready"
+        # Give it an extra moment to fully initialize before accepting connections
+        sleep 1
+        break
+    fi
+    if [ $i -eq 20 ]; then
+        echo "  Warning: SSH server may not be ready after 10 seconds"
+    else
+        sleep 0.5
+    fi
+done
 
 echo ""
 echo "╔════════════════════════════════════════╗"
