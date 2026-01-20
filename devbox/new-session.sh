@@ -2,8 +2,16 @@
 # new-session.sh - Creates a new tmux session with project selection
 # Called by ttyd for each new browser connection
 
-# Don't exit on error - handle errors gracefully
-set +e
+# Debug logging
+DEBUG_LOG="/tmp/new-session-debug-$$.log"
+exec 2> >(tee -a "$DEBUG_LOG")
+echo "=== Session started at $(date) ===" >> "$DEBUG_LOG"
+echo "PID: $$" >> "$DEBUG_LOG"
+
+# Trap to log on exit
+trap 'echo "=== Script exiting with code $? at line $LINENO ===" >> "$DEBUG_LOG"; echo "Last command: $BASH_COMMAND" >> "$DEBUG_LOG"' EXIT
+
+set -e
 
 # Colors for output
 RED='\033[0;31m'
@@ -152,33 +160,27 @@ echo -e "${BLUE}Project directory: ${PROJECT_DIR}${NC}"
 
 # Determine Docker connection settings
 if [ -n "$DOCKER_HOST" ]; then
-    echo -e "${BLUE}Docker: Using DOCKER_HOST=$DOCKER_HOST${NC}"
-    DOCKER_ENV="DOCKER_HOST=$DOCKER_HOST"
-elif [ -n "$DOCKER_CONTEXT" ]; then
-    echo -e "${BLUE}Docker: Using context $DOCKER_CONTEXT${NC}"
-    # Switch to the context now
-    docker context use "$DOCKER_CONTEXT" >/dev/null 2>&1 || echo -e "${RED}Warning: Could not set Docker context${NC}"
-    DOCKER_ENV=""
+    # Use DOCKER_HOST environment variable
+    export DOCKER_HOST
 else
-    # Fallback to DinD
-    echo -e "${BLUE}Docker: Using default DinD${NC}"
-    DOCKER_HOST="tcp://dind:2375"
-    DOCKER_ENV="DOCKER_HOST=$DOCKER_HOST"
+    # Use Docker context
+    export DOCKER_CONTEXT
 fi
 
-echo ""
-
-# Create tmux session
-echo "Creating tmux session..."
-tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_DIR" -n "shell"
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Failed to create tmux session${NC}"
-    exit 1
+# Ensure TERM is set to a valid value for tmux (fixes "xterm-ghostty" issue)
+export TERM="${TERM:-screen-256color}"
+if [[ "$TERM" == *"ghostty"* ]] || [[ "$TERM" == *"unknown"* ]]; then
+    export TERM="screen-256color"
 fi
 
-# Set environment in the shell window
-if [ -n "$DOCKER_ENV" ]; then
-    tmux send-keys -t "$SESSION_NAME:shell" "export $DOCKER_ENV" Enter
+# Create tmux session with windows
+# Window 0: shell
+if [ -n "$DOCKER_HOST" ]; then
+    tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_DIR" -n "shell" -e "DOCKER_HOST=$DOCKER_HOST" -e "TERM=$TERM"
+else
+    tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_DIR" -n "shell" -e "TERM=$TERM"
+    # Set Docker context
+    docker context use "$DOCKER_CONTEXT" 2>/dev/null || true
 fi
 
 # Window 1: nvim
