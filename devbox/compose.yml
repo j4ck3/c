@@ -3,10 +3,12 @@ services:
     image: docker:dind
     container_name: devbox-dind
     privileged: true
+    environment:
+      - DOCKER_TLS_CERTDIR=
     volumes:
       - dind-storage:/var/lib/docker
     ports:
-      - "2375:2375"  # Expose DinD daemon (for debugging/management)
+      - "2375:2375"
     networks:
       - devbox-network
     restart: unless-stopped

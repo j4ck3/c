@@ -2,7 +2,8 @@
 # new-session.sh - Creates a new tmux session with project selection
 # Called by ttyd for each new browser connection
 
-set -e
+# Don't exit on error - handle errors gracefully
+set +e
 
 # Colors for output
 RED='\033[0;31m'
@@ -148,25 +149,36 @@ SESSION_NAME="${PROJECT_NAME}-$$"
 
 echo -e "${GREEN}Starting session: ${SESSION_NAME}${NC}"
 echo -e "${BLUE}Project directory: ${PROJECT_DIR}${NC}"
-echo ""
 
-# Set Docker connection in tmux environment
+# Determine Docker connection settings
 if [ -n "$DOCKER_HOST" ]; then
-    # Use DOCKER_HOST environment variable
-    export DOCKER_HOST
+    echo -e "${BLUE}Docker: Using DOCKER_HOST=$DOCKER_HOST${NC}"
+    DOCKER_ENV="DOCKER_HOST=$DOCKER_HOST"
+elif [ -n "$DOCKER_CONTEXT" ]; then
+    echo -e "${BLUE}Docker: Using context $DOCKER_CONTEXT${NC}"
+    # Switch to the context now
+    docker context use "$DOCKER_CONTEXT" >/dev/null 2>&1 || echo -e "${RED}Warning: Could not set Docker context${NC}"
+    DOCKER_ENV=""
 else
-    # Use Docker context
-    export DOCKER_CONTEXT
+    # Fallback to DinD
+    echo -e "${BLUE}Docker: Using default DinD${NC}"
+    DOCKER_HOST="tcp://dind:2375"
+    DOCKER_ENV="DOCKER_HOST=$DOCKER_HOST"
 fi
 
-# Create tmux session with windows
-# Window 0: shell
-if [ -n "$DOCKER_HOST" ]; then
-    tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_DIR" -n "shell" -e "DOCKER_HOST=$DOCKER_HOST"
-else
-    tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_DIR" -n "shell"
-    # Set Docker context
-    docker context use "$DOCKER_CONTEXT" 2>/dev/null || true
+echo ""
+
+# Create tmux session
+echo "Creating tmux session..."
+tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_DIR" -n "shell"
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Failed to create tmux session${NC}"
+    exit 1
+fi
+
+# Set environment in the shell window
+if [ -n "$DOCKER_ENV" ]; then
+    tmux send-keys -t "$SESSION_NAME:shell" "export $DOCKER_ENV" Enter
 fi
 
 # Window 1: nvim
@@ -179,10 +191,9 @@ tmux send-keys -t "$SESSION_NAME:lazygit" "lazygit" Enter
 
 # Window 3: lazydocker
 tmux new-window -t "$SESSION_NAME" -n "lazydocker"
-if [ -n "$DOCKER_HOST" ]; then
-    tmux send-keys -t "$SESSION_NAME:lazydocker" "DOCKER_HOST=$DOCKER_HOST lazydocker" Enter
+if [ -n "$DOCKER_ENV" ]; then
+    tmux send-keys -t "$SESSION_NAME:lazydocker" "export $DOCKER_ENV && lazydocker" Enter
 else
-    # Context is already set, lazydocker will use it
     tmux send-keys -t "$SESSION_NAME:lazydocker" "lazydocker" Enter
 fi
 
