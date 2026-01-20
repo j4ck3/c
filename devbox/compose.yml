@@ -29,7 +29,7 @@ services:
       # Persistent home directory (dotfiles, nvim config, etc.)
       - devbox-home:/home/dev
       # Persistent SSH host keys (so they don't change on container restart)
-      - devbox-ssh-keys:/etc/ssh/keys
+      - devbox-ssh-keys:/etc/ssh/keys&
       # SSH keys for GitHub/GitLab (optional)
       - ${HOME}/.ssh:/home/dev/.ssh:ro
       - ./entrypoint.sh:/entrypoint.sh:ro
@@ -44,6 +44,9 @@ services:
       # Local access without auth
       - "7681:7681"  # Web terminal (ttyd)
       - "2222:22"    # SSH access for local terminal
+      # Common development ports (add more as needed)
+      - "3000:3000"  # React/Next.js default
+      - "8080:8080"  # Alternative web server port
     restart: unless-stopped
     tty: true
     stdin_open: true
