@@ -2,6 +2,7 @@ services:
   restic:
     image: instrumentisto/restic:latest
     container_name: restic
+    restart: unless-stopped
     environment:
       - RESTIC_REPOSITORY=/repo
       - RESTIC_PASSWORD=${RESTIC_PASSWORD}
@@ -19,6 +20,7 @@ services:
   rclone:
     image: rclone/rclone:latest
     container_name: rclone
+    restart: unless-stopped
     environment:
       - RCLONE_CONFIG=/config/rclone.conf
       - ONEDRIVE_PATH=${ONEDRIVE_PATH:-Backups/unraid}
@@ -35,6 +37,7 @@ services:
   backup-runner:
     image: instrumentisto/restic:latest
     container_name: backup-runner
+    restart: unless-stopped
     environment:
       - RESTIC_REPOSITORY=/repo
       - RESTIC_PASSWORD=${RESTIC_PASSWORD}

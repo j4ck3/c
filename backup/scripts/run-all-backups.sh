@@ -75,6 +75,12 @@ telegram_send() {
         return 0
     fi
     
+    # Telegram has a 4096 character limit - truncate to 4000 to be safe
+    local max_length=4000
+    if [ ${#message} -gt $max_length ]; then
+        message="${message:0:$max_length}...\n\n<i>(Message truncated - see log for full details)</i>"
+    fi
+    
     curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
         -d "chat_id=${TELEGRAM_CHAT_ID}" \
         -d "parse_mode=${parse_mode}" \

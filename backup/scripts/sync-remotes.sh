@@ -31,12 +31,16 @@ else
 fi
 
 # Try to find rclone.conf in common locations
-if [ -f "/mnt/cache/documents/compose/backup/rclone.conf" ]; then
+if [ -f "/mnt/cache/documents/compose/backup/config/rclone.conf" ]; then
+    RCLONE_CONFIG="/mnt/cache/documents/compose/backup/config/rclone.conf"
+elif [ -f "/mnt/user/documents/compose/backup/config/rclone.conf" ]; then
+    RCLONE_CONFIG="/mnt/user/documents/compose/backup/config/rclone.conf"
+elif [ -f "/mnt/cache/documents/compose/backup/rclone.conf" ]; then
     RCLONE_CONFIG="/mnt/cache/documents/compose/backup/rclone.conf"
 elif [ -f "/mnt/user/documents/compose/backup/rclone.conf" ]; then
     RCLONE_CONFIG="/mnt/user/documents/compose/backup/rclone.conf"
 else
-    RCLONE_CONFIG="/mnt/user/documents/compose/backup/rclone.conf"  # Default
+    RCLONE_CONFIG="/mnt/user/documents/compose/backup/config/rclone.conf"  # Default
 fi
 
 # Remote destinations (must match names in rclone.conf)
@@ -44,7 +48,7 @@ ONEDRIVE_REMOTE="onedrive"
 ONEDRIVE_PATH="${ONEDRIVE_PATH:-Backups/unraid}"
 
 MAINPC_REMOTE="mainpc"
-MAINPC_PATH="${MAINPC_PATH:-/home/user/backups/unraid}"
+MAINPC_PATH="${MAINPC_PATH:-/home/jacke/backups/unraid}"
 
 # Bandwidth limits (optional, set to 0 for unlimited)
 BANDWIDTH_LIMIT_ONEDRIVE="0"      # e.g., "10M" for 10 MB/s
@@ -90,7 +94,10 @@ get_rclone_cmd() {
     elif in_docker; then
         echo "rclone"
     elif command -v docker &> /dev/null; then
-        echo "docker run --rm -v ${RCLONE_CONFIG}:/config/rclone.conf -v ${BACKUP_SOURCE}:/backup:ro rclone/rclone --config /config/rclone.conf"
+        # Use the config directory path, not the full config file path
+        local config_dir="$(dirname "$RCLONE_CONFIG")"
+        # Mount SSH keys for SFTP authentication
+        echo "docker run --rm -v ${config_dir}:/config -v ${BACKUP_SOURCE}:/backup:ro -v /root/.ssh:/root/.ssh:ro rclone/rclone --config /config/rclone.conf"
     else
         log_error "rclone not found!"
         exit 1
@@ -185,7 +192,7 @@ sync_to_onedrive() {
 }
 
 sync_to_mainpc() {
-    log_info "Syncing to Main PC via SFTP..."
+    log_info "Syncing to Main PC via SFTP (rclone)..."
     
     local rclone_cmd=$(get_rclone_cmd)
     local dry_run_flag=""

@@ -1,6 +1,6 @@
 services:
   prometheus:
-    image: docker.io/prom/prometheus:v3.2.1
+    image: prom/prometheus:v2.51.0
     container_name: prometheus
     ports:
       - 9494:9090
@@ -9,14 +9,36 @@ services:
       - /mnt/user/appdata/prometheus/config/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
       - /mnt/user/appdata/prometheus/data:/prometheus
     restart: unless-stopped
+    networks:
+      - monitoring
+
   grafana:
-    image: docker.io/grafana/grafana-oss:11.5.2
+    image: grafana/grafana-oss:11.5.2
     container_name: grafana
     ports:
       - 3020:3000
     volumes:
       - /mnt/user/appdata/grafana/data:/var/lib/grafana
+      - /mnt/user/appdata/grafana/provisioning:/etc/grafana/provisioning:ro
     restart: unless-stopped
+    environment:
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_SERVER_ROOT_URL=https://monit.hjacke.com
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+    networks:
+      - monitoring
+      - npm_services
+    depends_on:
+      - prometheus
+      - loki
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`monit.hjacke.com`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      - "traefik.docker.network=npm_services"
+
   node_exporter:
     image: quay.io/prometheus/node-exporter:v1.9.0
     container_name: node_exporter
@@ -25,6 +47,9 @@ services:
     restart: unless-stopped
     volumes:
       - /:/host:ro,rslave
+    networks:
+      - monitoring
+      
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.51.0
     container_name: cadvisor
@@ -40,3 +65,40 @@ services:
       - /dev/kmsg
     privileged: true
     restart: unless-stopped
+    networks:
+      - monitoring
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: loki
+    ports:
+      - 3100:3100
+    volumes:
+      - /mnt/user/appdata/loki/config:/etc/loki
+      - /mnt/user/appdata/loki/data:/loki
+    command: -config.file=/etc/loki/loki-config.yaml
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: promtail
+    volumes:
+      - /mnt/user/appdata/promtail/config:/etc/promtail
+      - /mnt/user/backups/logs:/var/log/backups:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - loki
+
+networks:
+  monitoring:
+    name: monitoring
+    driver: bridge
+  npm_services:
+    external: true

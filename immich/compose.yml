@@ -1,0 +1,129 @@
+services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    container_name: immich-server
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+      - typesense
+    environment:
+      - TZ=Europe/Stockholm
+      - PUID=1000
+      - PGID=100
+      # Server bind address
+      - HOST=0.0.0.0
+      # Database
+      - DB_HOSTNAME=postgres
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - DB_DATABASE_NAME=immich
+      # Redis
+      - REDIS_HOSTNAME=redis
+      - REDIS_PORT=6379
+      # Typesense
+      - TYPESENSE_ENABLED=true
+      - TYPESENSE_HOST=typesense
+      - TYPESENSE_PORT=8108
+      - TYPESENSE_PROTOCOL=http
+      - TYPESENSE_API_KEY=xyz
+      # ML Service
+      - IMMICH_MACHINE_LEARNING_ENABLED=true
+      - IMMICH_MACHINE_LEARNING_URL=http://immich-machine-learning:3003
+      # Server
+      - IMMICH_WEB_URL=https://photos.hjacke.com
+      - IMMICH_SERVER_URL=https://photos.hjacke.com
+      # Storage
+      - UPLOAD_LOCATION=/usr/src/app/upload
+      - LIBRARY_LOCATION=/photos
+    volumes:
+      - /mnt/user/appdata/immich/upload:/usr/src/app/upload
+      - /mnt/cache/documents/Photos:/photos:ro
+      - /mnt/user/appdata/immich/library:/usr/src/app/library
+    networks:
+      - npm_services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.immich.rule=Host(`photos.hjacke.com`)"
+      - "traefik.http.routers.immich.entrypoints=websecure"
+      - "traefik.http.routers.immich.tls=true"
+      - "traefik.http.routers.immich.tls.certresolver=letsencrypt"
+      - "traefik.http.services.immich.loadbalancer.server.port=2283"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    container_name: immich-machine-learning
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Stockholm
+      - PUID=1000
+      - PGID=100
+    volumes:
+      - /mnt/user/appdata/immich/model-cache:/cache
+    networks:
+      - npm_services
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: immich-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=immich
+    volumes:
+      - /mnt/user/appdata/immich/postgres:/var/lib/postgresql/data
+    networks:
+      - npm_services
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: immich-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - /mnt/user/appdata/immich/redis:/data
+    networks:
+      - npm_services
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  typesense:
+    image: typesense/typesense:0.25.2
+    container_name: immich-typesense
+    restart: unless-stopped
+    environment:
+      - TYPESENSE_API_KEY=xyz
+      - TYPESENSE_DATA_DIR=/data
+    volumes:
+      - /mnt/user/appdata/immich/typesense:/data
+    networks:
+      - npm_services
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  npm_services:
+    external: true
+

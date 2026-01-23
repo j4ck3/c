@@ -20,7 +20,9 @@
 #   - RESTIC_PASSWORD environment variable set
 # =============================================================================
 
-set -e
+
+# Don't use set -e here - we need to handle errors gracefully
+set +e
 
 # =============================================================================
 # CONFIGURATION - Edit these values or set via environment
@@ -30,6 +32,9 @@ VM_DISK="/mnt/user/domains/Windows 10 Enterprise IoT LTSC_v2/vdisk1.img"
 RESTIC_REPO="${RESTIC_REPO:-/mnt/user/backups/restic}"
 SHUTDOWN_TIMEOUT=300  # 5 minutes to wait for graceful shutdown
 STARTUP_WAIT=60       # Wait 60 seconds after starting VM
+
+# Track exit code
+EXIT_CODE=0
 
 # Colors for output
 RED='\033[0;31m'
@@ -135,7 +140,7 @@ check_restic() {
     # Try Docker
     if command -v docker &> /dev/null; then
         log_info "Using restic via Docker"
-        RESTIC_CMD="docker run --rm -v ${RESTIC_REPO}:/repo -v /mnt/user/domains:/data -e RESTIC_REPOSITORY=/repo -e RESTIC_PASSWORD restic/restic"
+        RESTIC_CMD="docker run --rm -v ${RESTIC_REPO}:/repo -v /mnt/user/domains:/data -e RESTIC_REPOSITORY=/repo -e RESTIC_PASSWORD=${RESTIC_PASSWORD} instrumentisto/restic:latest"
         return 0
     fi
     
@@ -158,7 +163,8 @@ backup_vm_disk() {
     # Export for restic
     export RESTIC_REPOSITORY="$RESTIC_REPO"
     
-    # Run restic backup
+    # Run restic backup - capture exit code
+    local backup_exit=0
     if [ -n "$RESTIC_CMD" ]; then
         # Docker mode
         $RESTIC_CMD backup \
@@ -167,6 +173,7 @@ backup_vm_disk() {
             --tag "windows" \
             --tag "automated" \
             "/data/Windows 10 Enterprise IoT LTSC_v2/vdisk1.img"
+        backup_exit=$?
     else
         # Native mode
         restic backup \
@@ -175,9 +182,17 @@ backup_vm_disk() {
             --tag "windows" \
             --tag "automated" \
             "$VM_DISK"
+        backup_exit=$?
     fi
     
-    log_success "VM disk backup completed"
+    if [ $backup_exit -eq 0 ]; then
+        log_success "VM disk backup completed"
+        return 0
+    else
+        log_error "VM disk backup failed (exit code: $backup_exit)"
+        log_error "This may indicate repository corruption. Check the error above."
+        return $backup_exit
+    fi
 }
 
 # =============================================================================
@@ -220,18 +235,26 @@ main() {
     # Handle skip-shutdown flag
     if [[ "$1" == "--skip-shutdown" ]]; then
         log_warn "Skipping VM shutdown - backup may be inconsistent!"
-        backup_vm_disk
+        if ! backup_vm_disk; then
+            EXIT_CODE=1
+        fi
     else
         # Normal flow: shutdown -> backup -> start
         if [ "$VM_WAS_RUNNING" = true ]; then
             shutdown_vm
         fi
         
-        backup_vm_disk
+        # Attempt backup - don't exit on failure
+        if ! backup_vm_disk; then
+            EXIT_CODE=1
+            log_error "Backup failed, but continuing to restart VM..."
+        fi
         
-        # Only restart if it was running before
+        # Always restart VM if it was running before (even if backup failed)
         if [ "$VM_WAS_RUNNING" = true ]; then
-            start_vm
+            if ! start_vm; then
+                EXIT_CODE=1
+            fi
         else
             log_info "VM was not running before backup, leaving it stopped"
         fi
@@ -239,8 +262,14 @@ main() {
     
     echo ""
     echo "=============================================="
-    echo "  VM Backup Completed: $(date)"
+    if [ $EXIT_CODE -eq 0 ]; then
+        echo "  VM Backup Completed: $(date)"
+    else
+        echo "  VM Backup Failed: $(date)"
+    fi
     echo "=============================================="
+    
+    exit $EXIT_CODE
 }
 
 # Trap to ensure VM is restarted even if script fails
