@@ -1,39 +1,47 @@
 services:
-  gluetun:
-    image: qmcgaw/gluetun:latest
-    container_name: gluetun
-    hostname: gluetun
+  gluetun_torrents:
+    image: qmcgaw/gluetun
+    container_name: gluetun_torrents
+    hostname: gluetun_torrents
+    restart: unless-stopped
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
-    ports:
-      - 8888:8888/tcp # HTTP proxy
-      - 8080:8080 # qbittorrent
-      - 8000:8000 # http server
-      - 5030:5030 # slskd
-      - 5031:5031 # slskd
-      - 50300:50300 # slskd
-      - 6565:6565 # nicotineplus
-      - 2234:2234 # nicotineplus
-      - 7474:7474 # autobrr
+    # Ports are exposed through Traefik via docker networks, no host mapping needed
+    # ports:
+    #   - 8080:8080/tcp # qbittorrent
+    #   - 6565:6565/tcp # nicotineplus
+    #   - 8000:8000/tcp # healthcheck
     volumes:
-      - /mnt/user/appdata/gluetun:/gluetun
+      - /mnt/user/appdata/gluetun-torrents:/gluetun
+    env_file:
+      - .env
     environment:
-      - VPN_SERVICE_PROVIDER=custom
+      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER}
       - VPN_TYPE=${VPN_TYPE}
-      - VPN_ENDPOINT_IP=${VPN_ENDPOINT_IP}
-      - VPN_ENDPOINT_PORT=${VPN_ENDPOINT_PORT}
-      - WIREGUARD_PUBLIC_KEY=${WIREGUARD_PUBLIC_KEY}
       - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - WIREGUARD_PUBLIC_KEY=${WIREGUARD_PUBLIC_KEY}
       - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
       - TZ=Europe/Stockholm
       - UPDATER_PERIOD=24h
+      - DNS_SERVER=on
+      - DNS_UPSTREAM_RESOLVER_TYPE=DoT
+      - DNS_UPSTREAM_RESOLVERS=cloudflare
+      - DNS_CACHING=on
+      - DNS_ADDRESS=127.0.0.1
     networks:
-      - gluetun_net
       - npm_services
+      - gluetun_net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/v1/openvpn/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=npm_services"
       - "traefik.http.routers.qbittorrent.rule=Host(`torrent.hjacke.com`)"
       - "traefik.http.routers.qbittorrent.entrypoints=websecure"
       - "traefik.http.routers.qbittorrent.tls=true"
@@ -44,12 +52,14 @@ services:
       - "traefik.http.routers.nicotine.tls=true"
       - "traefik.http.routers.nicotine.service=nicotine"
       - "traefik.http.services.nicotine.loadbalancer.server.port=6565"
-    restart: unless-stopped
 
   qBittorrent:
     image: lscr.io/linuxserver/qbittorrent
     container_name: qBittorrent
-    network_mode: service:gluetun
+    depends_on:
+      gluetun_torrents:
+        condition: service_started
+    network_mode: service:gluetun_torrents
     environment:
       - PUID=1000
       - PGID=100
@@ -58,18 +68,15 @@ services:
     volumes:
       - /mnt/user/appdata/qbittorrent:/config
       - /mnt/user/downloads/qbitorrent:/downloads
-    depends_on:
-      gluetun:
-        condition: service_healthy
     restart: unless-stopped
 
   nicotineplus-proper:
     image: sirjmann92/nicotineplus-proper:latest
     container_name: nicotine
-    network_mode: service:gluetun
     depends_on:
-      gluetun:
-        condition: service_healthy
+      gluetun_torrents:
+        condition: service_started
+    network_mode: service:gluetun_torrents
     env_file:
       - .env
     environment:
@@ -98,6 +105,7 @@ services:
 
 networks:
   gluetun_net:
-    driver: bridge
+    name: gluetun-torrents_gluetun_net
+    external: true
   npm_services:
     external: true
