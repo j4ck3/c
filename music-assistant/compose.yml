@@ -1,0 +1,42 @@
+services:
+  music-assistant:
+    image: ghcr.io/music-assistant/server:latest
+    container_name: music-assistant
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /mnt/user/appdata/music-assistant/data:/data
+      - /mnt/user/music:/music:ro
+      - /mnt/user/podcasts:/podcasts:ro
+    cap_add:
+      - SYS_ADMIN
+      - DAC_READ_SEARCH
+    security_opt:
+      - apparmor:unconfined
+    environment:
+      - TZ=Europe/Stockholm
+      - LOG_LEVEL=info
+
+  # Proxy so Traefik (Docker) can route to Music Assistant (host network on 8095)
+  music-assistant-proxy:
+    image: nginx:alpine
+    container_name: music-assistant-proxy
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /mnt/user/documents/compose/music-assistant/nginx-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - npm_services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=npm_services"
+      - "traefik.http.routers.music-assistant.rule=Host(`music-assistant.hjacke.com`)"
+      - "traefik.http.routers.music-assistant.entrypoints=websecure"
+      - "traefik.http.routers.music-assistant.tls=true"
+      - "traefik.http.routers.music-assistant.service=music-assistant"
+      - "traefik.http.services.music-assistant.loadbalancer.server.port=80"
+
+networks:
+  npm_services:
+    external: true

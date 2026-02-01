@@ -13,14 +13,6 @@ services:
       - 8381:8388/tcp # Shadowsocks
       - 8381:8388/udp # Shadowsocks
       - 9393:8080/tcp # SearXNG
-      - 8080:8080/tcp # qbittorrent
-      - 8000:8000/tcp # http server
-      - 5030:5030/tcp # slskd
-      - 5031:5031/tcp # slskd
-      - 50300:50300/tcp # slskd
-      - 6565:6565/tcp # nicotineplus
-      # - 2234:2234/tcp # nicotineplus (port conflict, commented out)
-      - 7474:7474/tcp # autobrr
     volumes:
       - /mnt/user/appdata/searxng/gluetun:/gluetun
     environment:
@@ -34,25 +26,12 @@ services:
     networks:
       - docker0
       - npm_services
-      - gluetun_net
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=npm_services"
       - "traefik.http.routers.searxng.rule=Host(`searxng.hjacke.com`)"
       - "traefik.http.routers.searxng.entrypoints=websecure"
       - "traefik.http.routers.searxng.tls=true"
-      - "traefik.http.routers.searxng.service=searxng"
       - "traefik.http.services.searxng.loadbalancer.server.port=8080"
-      - "traefik.http.routers.qbittorrent.rule=Host(`torrent.hjacke.com`)"
-      - "traefik.http.routers.qbittorrent.entrypoints=websecure"
-      - "traefik.http.routers.qbittorrent.tls=true"
-      - "traefik.http.routers.qbittorrent.service=qbittorrent"
-      - "traefik.http.services.qbittorrent.loadbalancer.server.port=8080"
-      - "traefik.http.routers.nicotine.rule=Host(`nicotine.hjacke.com`)"
-      - "traefik.http.routers.nicotine.entrypoints=websecure"
-      - "traefik.http.routers.nicotine.tls=true"
-      - "traefik.http.routers.nicotine.service=nicotine"
-      - "traefik.http.services.nicotine.loadbalancer.server.port=6565"
 
   searxng:
     image: searxng/searxng:latest
@@ -67,7 +46,7 @@ services:
       - tsdproxy.name=searxng
       - net.unraid.docker.icon=https://avatars.githubusercontent.com/u/80454229?s=48&v=4
     environment:
-      - SEARXNG_BASE_URL=https://${SEARXNG_HOSTNAME:-searxng.hjacke.com}/
+      - SEARXNG_BASE_URL=https://${SEARXNG_HOSTNAME}/
       - UWSGI_WORKERS=${SEARXNG_UWSGI_WORKERS:-4}
       - UWSGI_THREADS=${SEARXNG_UWSGI_THREADS:-4}
     volumes:
@@ -87,7 +66,4 @@ networks:
   docker0:
     external: true
   npm_services:
-    external: true
-  gluetun_net:
-    name: gluetun-torrents_gluetun_net
     external: true 

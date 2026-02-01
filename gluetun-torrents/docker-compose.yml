@@ -8,11 +8,10 @@ services:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
-    # Ports are exposed through Traefik via docker networks, no host mapping needed
-    # ports:
-    #   - 8080:8080/tcp # qbittorrent
-    #   - 6565:6565/tcp # nicotineplus
-    #   - 8000:8000/tcp # healthcheck
+    expose:
+      - "8080"  # qbittorrent
+      - "6565"  # nicotineplus
+      - "7476"  # qui (if needed later)
     volumes:
       - /mnt/user/appdata/gluetun-torrents:/gluetun
     env_file:
@@ -34,7 +33,7 @@ services:
       - npm_services
       - gluetun_net
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/v1/openvpn/status"]
+      test: ["CMD", "ping", "-c", "1", "1.1.1.1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -95,7 +94,7 @@ services:
       - /mnt/user/downloads/soulseek:/downloads
       - /mnt/user/downloads/soulseek/incomplete:/incomplete
       - /mnt/user/music:/music:rw
-      - /mnt/user/media/Youtube:/youtube-paywall:rww
+      - /mnt/user/media/Youtube:/youtube-paywall:rw
       - /mnt/user/podcasts:/podcasts:rw
       - /mnt/user/syncthing/qqq:/nsfw:rw
       - /mnt/user/appdata/nicotineplus-proper/config:/config
@@ -103,9 +102,29 @@ services:
       - /mnt/user/syncthing/apps:/apps:rw
     restart: unless-stopped
 
+  qui:
+    image: ghcr.io/autobrr/qui:latest
+    container_name: qui
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Stockholm
+    volumes:
+      - /mnt/user/appdata/qui:/config
+    networks:
+      - gluetun_net
+      - npm_services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=npm_services"
+      - "traefik.http.routers.qui.rule=Host(`qui.hjacke.com`)"
+      - "traefik.http.routers.qui.entrypoints=websecure"
+      - "traefik.http.routers.qui.tls=true"
+      - "traefik.http.routers.qui.service=qui"
+      - "traefik.http.services.qui.loadbalancer.server.port=7476"
+
 networks:
   gluetun_net:
-    name: gluetun-torrents_gluetun_net
+    name: searxng_gluetun_net
     external: true
   npm_services:
     external: true
