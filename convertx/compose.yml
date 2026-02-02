@@ -1,0 +1,23 @@
+services:
+  convertx:
+    image: ghcr.io/c4illin/convertx
+    container_name: convertx
+    restart: unless-stopped
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - ACCOUNT_REGISTRATION=false
+    volumes:
+      - /mnt/user/appdata/convertx:/app/data
+    networks:
+      - npm_services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.convertx.rule=Host(`tools.hjacke.com`)"
+      - "traefik.http.routers.convertx.entrypoints=websecure"
+      - "traefik.http.routers.convertx.tls=true"
+      - "traefik.http.routers.convertx.tls.certresolver=letsencrypt"
+      - "traefik.http.services.convertx.loadbalancer.server.port=3000"
+
+networks:
+  npm_services:
+    external: true
