@@ -4,20 +4,18 @@ services:
     container_name: freshrss
     hostname: freshrss
     restart: unless-stopped
-    ports:
-      - "6464:80"
     volumes:
       - /mnt/user/appdata/freshrss:/config
     environment:
       - PUID=99
       - PGID=100
       - UMASK=022
-      - TZ=Sweden/Stockholm
+      - TZ=Europe/Stockholm
     networks:
       - npm_services
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.freshrss.rule=Host(`freshrss.hjacke.com`)"
+      - "traefik.http.routers.freshrss.rule=Host(`rss.hjacke.com`)"
       - "traefik.http.routers.freshrss.entrypoints=websecure"
       - "traefik.http.routers.freshrss.tls=true"
       - "traefik.http.services.freshrss.loadbalancer.server.port=80"

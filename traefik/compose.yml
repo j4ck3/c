@@ -17,9 +17,8 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-    ports:
-      - "80:80"
-      - "443:443"
+    # No ports needed - macvlan gives Traefik its own IP (10.0.0.25)
+    # accessible directly on the network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /mnt/user/documents/compose/traefik/certs:/etc/traefik/certs:ro

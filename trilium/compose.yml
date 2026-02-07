@@ -9,7 +9,7 @@ configs:
           "${TS_CERT_DOMAIN}:443": {
             "Handlers": {
               "/": {
-                "Proxy": "http://127.0.0.1:8080"
+                "Proxy": "http://trilium:8080"
               }
             }
           }
@@ -20,10 +20,33 @@ configs:
       }
 
 services:
+  trilium:
+    image: zadam/trilium:latest
+    container_name: trilium
+    restart: unless-stopped
+    environment:
+      - TRILIUM_DATA_DIR=/home/node/trilium-data
+    volumes:
+      - /mnt/user/trilium:/home/node/trilium-data
+    networks:
+      - npm_services
+      - trilium-internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.trilium.rule=Host(`trilium.hjacke.com`)"
+      - "traefik.http.routers.trilium.entrypoints=websecure"
+      - "traefik.http.routers.trilium.tls=true"
+      - "traefik.http.routers.trilium.service=trilium"
+      - "traefik.http.services.trilium.loadbalancer.server.port=8080"
+      - "traefik.http.services.trilium.loadbalancer.server.scheme=http"
+
   trilium-ts:
     image: tailscale/tailscale:latest
     container_name: trilium-ts
-    hostname: trilium
+    hostname: trilium-ts
+    restart: unless-stopped
+    depends_on:
+      - trilium
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
@@ -35,27 +58,7 @@ services:
     volumes:
       - trilium-ts-state:/var/lib/tailscale
     networks:
-      - npm_services
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.trilium.rule=Host(`trilium.hjacke.com`)"
-      - "traefik.http.routers.trilium.entrypoints=websecure"
-      - "traefik.http.routers.trilium.tls=true"
-      - "traefik.http.routers.trilium.service=trilium"
-      - "traefik.http.services.trilium.loadbalancer.server.port=8080"
-      - "traefik.http.services.trilium.loadbalancer.server.scheme=http"
-    restart: unless-stopped
-
-  trilium:
-    image: zadam/trilium:latest
-    container_name: trilium
-    restart: unless-stopped
-    network_mode: service:trilium-ts
-    environment:
-      - TRILIUM_DATA_DIR=/home/node/trilium-data
-    volumes:
-      - /mnt/user/trilium:/home/node/trilium-data
-    restart: unless-stopped
+      - trilium-internal
 
 volumes:
   trilium-ts-state:
@@ -63,3 +66,4 @@ volumes:
 networks:
   npm_services:
     external: true
+  trilium-internal:

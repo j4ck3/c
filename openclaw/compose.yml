@@ -1,0 +1,23 @@
+services:
+  openclaw-gateway:
+    image: openclaw:local
+    container_name: openclaw-gateway
+    restart: unless-stopped
+    environment:
+      - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - /mnt/user/appdata/openclaw/config:/home/openclaw/.openclaw
+      - /mnt/user/appdata/openclaw/workspace:/home/openclaw/workspace
+    networks:
+      - npm_services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openclaw.rule=Host(`openclaw.hjacke.com`)"
+      - "traefik.http.routers.openclaw.entrypoints=websecure"
+      - "traefik.http.routers.openclaw.tls=true"
+      - "traefik.http.services.openclaw.loadbalancer.server.port=18789"
+
+networks:
+  npm_services:
+    external: true
