@@ -31,6 +31,19 @@ else
     echo "  Context 'instance-20251201-2024' already exists, skipping..."
 fi
 
+# jpc-arch (100.83.216.80)
+if ! docker context ls --format "{{.Name}}" | grep -q "^jpc-arch$"; then
+    CONTEXT_NAME="jpc-arch"
+    echo "Creating context for $CONTEXT_NAME (100.83.216.80)..."
+    if docker context create "$CONTEXT_NAME" --docker "host=tcp://100.83.216.80:2375" --description "jpc-arch server via Tailscale" 2>/dev/null; then
+        echo "  ✓ Created context '$CONTEXT_NAME'"
+    else
+        echo "  ✗ Failed to create context '$CONTEXT_NAME'"
+    fi
+else
+    echo "  Context 'jpc-arch' already exists, skipping..."
+fi
+
 echo ""
 echo "Available Docker contexts:"
 docker context ls

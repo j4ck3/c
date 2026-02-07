@@ -1,18 +1,68 @@
-# Custom Neko Chromium with Intel VAAPI support for Raptor Lake
+# Custom Neko Chromium with Intel VAAPI support and fingerprint hardening
 FROM ghcr.io/m1k1o/neko/intel-chromium:latest
 
-# Add bookworm repos for newer Intel driver
+# Add bookworm repos for newer Intel drivers
 RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" >> /etc/apt/sources.list.d/bookworm.list && \
     echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list.d/bookworm.list
 
-# Install newer Intel media driver
+# Install Intel GPU drivers:
+#  - VAAPI drivers for hardware video encoding
+#  - Mesa OpenGL/Vulkan drivers for WebGL (fixes SwiftShader fallback)
 RUN apt-get update && \
     apt-get install -y -t bookworm \
         intel-media-va-driver-non-free \
         libigdgmm12 \
         libva2 \
         libva-drm2 \
-        libva-x11-2 && \
+        libva-x11-2 \
+        libgl1-mesa-dri \
+        mesa-vulkan-drivers \
+        libegl-mesa0 \
+        libgbm1 \
+        libglx-mesa0 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Remove uncommon fonts that massively increase fingerprint uniqueness.
+# The Asian/CJK fonts (AR PL UKai, AR PL UMing, etc.) made the font list 0.00% unique.
+# Keep only standard Latin fonts (DejaVu, Liberation, Noto Sans/Serif).
+RUN apt-get update && \
+    apt-get purge -y \
+        'fonts-arphic-*' \
+        'fonts-noto-cjk*' \
+        'fonts-noto-color-emoji' \
+        'fonts-khmeros*' \
+        'fonts-lohit-*' \
+        'fonts-tlwg-*' \
+        'fonts-sil-*' \
+        'fonts-beng*' \
+        'fonts-deva*' \
+        'fonts-gujr*' \
+        'fonts-guru*' \
+        'fonts-knda*' \
+        'fonts-mlym*' \
+        'fonts-orya*' \
+        'fonts-telu*' \
+        'fonts-taml*' \
+        'fonts-thai*' \
+        'fonts-tibetan-machine' \
+        'fonts-lklug-sinhala' \
+        'fonts-smc*' \
+        'fonts-gargi' \
+        'fonts-navilu' \
+        'fonts-nakula' \
+        'fonts-sahadeva' \
+        'fonts-samyak*' \
+        'fonts-sarai' \
+        'fonts-wqy-*' \
+        'fonts-ipafont*' \
+        'fonts-vlgothic' \
+        'fonts-takao*' \
+        'fonts-nanum*' \
+        'fonts-unfonts-core' \
+        'fonts-indic' 2>/dev/null || true && \
+    apt-get autoremove -y && \
+    fc-cache -f && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -30,7 +80,17 @@ RUN apt-get update && \
 RUN mkdir -p /home/neko/.config/BraveSoftware/Brave-Browser/Crashpad && \
     chown -R neko:neko /home/neko/.config/BraveSoftware
 
-# Create Brave supervisord config (replace chromium config)
+# Copy fingerprint spoofing extension
+COPY fingerprint-spoofer /opt/fingerprint-spoofer
+
+# Create Brave supervisord config with privacy/fingerprint flags
+# Key additions:
+#   --lang=en-US                 : Fix content language from 0.57% → ~66%
+#   --ignore-gpu-blocklist       : Allow Intel GPU for WebGL (avoid SwiftShader)
+#   --enable-gpu-rasterization   : Use GPU for rendering
+#   --enable-zero-copy           : Better GPU utilization
+#   --load-extension             : Load fingerprint normalizer extension
+#   --disable-background-networking : Reduce network fingerprinting
 RUN echo '[program:chromium]\n\
 environment=HOME="/home/%(ENV_USER)s",USER="%(ENV_USER)s",DISPLAY="%(ENV_DISPLAY)s"\n\
 command=/usr/bin/brave-browser\n\
@@ -43,6 +103,12 @@ command=/usr/bin/brave-browser\n\
   --disable-dev-shm-usage\n\
   --no-sandbox\n\
   --password-store=basic\n\
+  --lang=en-US\n\
+  --ignore-gpu-blocklist\n\
+  --enable-gpu-rasterization\n\
+  --enable-zero-copy\n\
+  --load-extension=/opt/fingerprint-spoofer\n\
+  --disable-background-networking\n\
 stopsignal=INT\n\
 autorestart=true\n\
 priority=800\n\

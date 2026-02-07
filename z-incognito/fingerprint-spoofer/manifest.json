@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Fingerprint Normalizer",
+  "version": "1.0",
+  "description": "Normalizes browser fingerprint to reduce uniqueness",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["spoof.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    }
+  ]
+}

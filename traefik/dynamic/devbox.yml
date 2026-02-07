@@ -1,0 +1,27 @@
+# code.hjacke.com -> devbox web terminal (ttyd)
+# Traefik and devbox are on DIFFERENT hosts, so the route is defined here (file provider).
+#
+# 1. Replace DEVBOX_HOST with the IP or hostname of the machine running devbox,
+#    as reachable from the Traefik host (e.g. 192.168.1.50 or my-pc.lan).
+# 2. Replace the basicAuth user below with your real user:hash (see REMOTE_SETUP.md).
+#
+http:
+  routers:
+    devbox:
+      rule: "Host(`code.hjacke.com`)"
+      entryPoints:
+        - websecure
+      service: devbox
+      middlewares:
+        - devbox-auth
+  services:
+    devbox:
+      loadBalancer:
+        servers:
+          - url: "http://DEVBOX_HOST:7681"
+        passHostHeader: true
+  middlewares:
+    devbox-auth:
+      basicAuth:
+        users:
+          - "replaceme:replaceme"

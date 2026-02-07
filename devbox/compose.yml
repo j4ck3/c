@@ -8,7 +8,9 @@ services:
     volumes:
       - dind-storage:/var/lib/docker
     ports:
-      - "2375:2375"
+      - "2376:2375" # DinD API (2376 to avoid conflict with host Docker on 2375)
+      - "13000:3000" # Apps in DinD (13000 to avoid conflict with host 3000)
+      - "18080:8080" # Apps in DinD (18080 to avoid conflict with host 8080)
     networks:
       - devbox-network
     restart: unless-stopped
@@ -29,11 +31,13 @@ services:
       # Persistent home directory (dotfiles, nvim config, etc.)
       - devbox-home:/home/dev
       # Persistent SSH host keys (so they don't change on container restart)
-      - devbox-ssh-keys:/etc/ssh/keys&
+      - devbox-ssh-keys:/etc/ssh/keys
       # SSH keys for GitHub/GitLab (optional)
       - ${HOME}/.ssh:/home/dev/.ssh:ro
       - ./entrypoint.sh:/entrypoint.sh:ro
       - ./new-session.sh:/usr/local/bin/new-session.sh:ro
+      # Neovim: show hidden files in netrw and Telescope (copied into ~/.config/nvim by entrypoint)
+      - ./nvim-config:/opt/devbox-nvim-config:ro
     environment:
       - TERM=xterm-256color
       - COLORTERM=truecolor
@@ -42,11 +46,9 @@ services:
       - devbox-network
     ports:
       # Local access without auth
-      - "7681:7681"  # Web terminal (ttyd)
-      - "2222:22"    # SSH access for local terminal
-      # Common development ports (add more as needed)
-      - "3000:3000"  # React/Next.js default
-      - "8080:8080"  # Alternative web server port
+      - "7681:7681" # Web terminal (ttyd)
+      - "2222:22" # SSH access for local terminal
+      # Dev app ports are on dind (13000→3000, 18080→8080); add more on dind if needed
     restart: unless-stopped
     tty: true
     stdin_open: true
@@ -71,6 +73,7 @@ services:
       - ${HOME}/.ssh:/home/dev/.ssh:ro
       - ./entrypoint.sh:/entrypoint.sh:ro
       - ./new-session.sh:/usr/local/bin/new-session.sh:ro
+      - ./nvim-config:/opt/devbox-nvim-config:ro
     environment:
       - DOCKER_HOST=tcp://dind:2375
       - TERM=xterm-256color
@@ -78,15 +81,9 @@ services:
     networks:
       - devbox-network
       - npm_services
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.devbox.rule=Host(`code.hjacke.com`)"
-      - "traefik.http.routers.devbox.entrypoints=websecure"
-      - "traefik.http.routers.devbox.tls=true"
-      - "traefik.http.routers.devbox.tls.certresolver=letsencrypt"
-      - "traefik.http.middlewares.devbox-auth.basicauth.users=${DEVBOX_AUTH_USERS}"
-      - "traefik.http.routers.devbox.middlewares=devbox-auth"
-      - "traefik.http.services.devbox.loadbalancer.server.port=7681"
+    ports:
+      - "7681:7681"  # Expose ttyd so Traefik (on another host) can reach this host:7681
+    # Route is in traefik/dynamic/devbox.yml (Traefik is on another host)
     restart: unless-stopped
     tty: true
     stdin_open: true

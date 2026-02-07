@@ -13,36 +13,31 @@ if [ -w /home/dev ]; then
     cd /home/dev
 fi
 
-# Copy opencode files from staging area if they don't exist or are empty
-# This is needed because the persistent home volume overwrites /home/dev at runtime
+# Sync opencode files from staging area (only copies missing files, preserves existing)
+# Uses cp -rn (no-clobber) to never overwrite - this preserves plans and session data!
 if [ -d /opt/opencode-staging/config ]; then
-    if [ ! -s /home/dev/.config/opencode/opencode.json ]; then
-        echo "Copying opencode configuration from staging area..."
-        mkdir -p /home/dev/.config/opencode
-        rm -rf /home/dev/.config/opencode/* 2>/dev/null || true
-        cp -r /opt/opencode-staging/config/* /home/dev/.config/opencode/
-        chown -R dev:dev /home/dev/.config/opencode
-    fi
+    # Only copy missing files from staging - preserve existing config
+    mkdir -p /home/dev/.config/opencode
+    echo "Syncing opencode config from staging (preserving existing files)..."
+    cp -rn /opt/opencode-staging/config/* /home/dev/.config/opencode/ 2>/dev/null || true
+    chown -R dev:dev /home/dev/.config/opencode
 fi
 
 if [ -d /opt/opencode-staging/cache ]; then
-    if [ ! -s /home/dev/.cache/opencode/package.json ]; then
-        echo "Copying opencode cache from staging area..."
-        mkdir -p /home/dev/.cache/opencode
-        rm -rf /home/dev/.cache/opencode/* 2>/dev/null || true
-        cp -r /opt/opencode-staging/cache/* /home/dev/.cache/opencode/
-        chown -R dev:dev /home/dev/.cache/opencode
-    fi
+    # Only copy missing files from staging - preserve existing cache
+    mkdir -p /home/dev/.cache/opencode
+    echo "Syncing opencode cache from staging (preserving existing files)..."
+    cp -rn /opt/opencode-staging/cache/* /home/dev/.cache/opencode/ 2>/dev/null || true
+    chown -R dev:dev /home/dev/.cache/opencode
 fi
 
 if [ -d /opt/opencode-staging/data ]; then
-    if [ ! -s /home/dev/.local/share/opencode/auth.json ]; then
-        echo "Copying opencode data from staging area..."
-        mkdir -p /home/dev/.local/share/opencode
-        rm -rf /home/dev/.local/share/opencode/* 2>/dev/null || true
-        cp -r /opt/opencode-staging/data/* /home/dev/.local/share/opencode/
-        chown -R dev:dev /home/dev/.local/share/opencode
-    fi
+    # Only copy missing files from staging - NEVER delete existing data (preserves plans!)
+    mkdir -p /home/dev/.local/share/opencode
+    echo "Syncing opencode data from staging (preserving existing files)..."
+    # Use cp -n (no-clobber) to only copy files that don't exist
+    cp -rn /opt/opencode-staging/data/* /home/dev/.local/share/opencode/ 2>/dev/null || true
+    chown -R dev:dev /home/dev/.local/share/opencode
 fi
 
 # Set up auto-start tmux on SSH login (not for ttyd/browser)
@@ -97,17 +92,26 @@ if [ ! -d /home/dev/.config/nvim ]; then
     echo "LazyVim setup complete!"
 fi
 
+# Copy devbox nvim config (show hidden files in netrw and telescope)
+if [ -d /opt/devbox-nvim-config ]; then
+    mkdir -p /home/dev/.config/nvim/lua/config /home/dev/.config/nvim/lua/plugins
+    [ -f /opt/devbox-nvim-config/lua/config/devbox.lua ] && cp /opt/devbox-nvim-config/lua/config/devbox.lua /home/dev/.config/nvim/lua/config/devbox.lua
+    [ -f /opt/devbox-nvim-config/lua/plugins/devbox.lua ] && cp /opt/devbox-nvim-config/lua/plugins/devbox.lua /home/dev/.config/nvim/lua/plugins/devbox.lua
+    chown -R dev:dev /home/dev/.config/nvim/lua/config/devbox.lua /home/dev/.config/nvim/lua/plugins/devbox.lua 2>/dev/null || true
+fi
+
 # Set up opencode config directory (ensure it's writable for opencode)
 mkdir -p /home/dev/.config/opencode
 # Ensure directory is owned by dev user (needed for opencode to write package.json)
 sudo chown -R dev:dev /home/dev/.config/opencode 2>/dev/null || true
 chmod 755 /home/dev/.config/opencode 2>/dev/null || true
 
-# Pre-install opencode plugins if package.json exists to avoid runtime compilation
+# Pre-install and update opencode plugins if package.json exists
 if [ -f /home/dev/.config/opencode/package.json ]; then
-    echo "Pre-installing opencode plugins to avoid runtime compilation..."
+    echo "Installing/updating opencode plugins..."
     cd /home/dev/.config/opencode
-    # Run bun install to ensure all dependencies are installed and compiled upfront
+    # Update opencode-antigravity-auth to latest (fixes "version no longer supported" errors)
+    bun add opencode-antigravity-auth@latest 2>/dev/null || bun install 2>/dev/null || true
     bun install 2>/dev/null || true
     cd - >/dev/null 2>&1 || true
 fi
@@ -138,19 +142,14 @@ EOF
     fi
 fi
 
-# Fix opencode.json to use specific plugin versions instead of @latest
-# This prevents Bun from trying to resolve/install at runtime (which can crash)
-if [ -f /home/dev/.config/opencode/opencode.json ]; then
-    # Check if opencode.json has @latest and replace with installed version
-    if grep -q "opencode-antigravity-auth@latest" /home/dev/.config/opencode/opencode.json 2>/dev/null; then
-        echo "Fixing opencode.json: pinning plugin versions to avoid runtime resolution..."
-        cd /home/dev/.config/opencode
-        # Use jq to replace @latest with 1.3.0 (or get from package.json)
-        INSTALLED_VERSION=$(grep -o '"opencode-antigravity-auth": "[^"]*"' package.json 2>/dev/null | grep -o '[0-9.]*' | head -1 || echo "1.3.0")
-        if command -v jq >/dev/null 2>&1; then
-            jq --arg version "$INSTALLED_VERSION" 'if .plugin then .plugin = [.plugin[] | if contains("@latest") then sub("@latest"; "@\($version)") else . end] else . end' opencode.json > opencode.json.tmp && mv opencode.json.tmp opencode.json 2>/dev/null || true
-        fi
-        cd - >/dev/null 2>&1 || true
+# Update opencode-antigravity-auth to @latest if pinned to outdated version
+# This fixes "This version of Antigravity is no longer supported" errors
+if [ -f /home/dev/.config/opencode/opencode.json ] && command -v jq >/dev/null 2>&1; then
+    if grep -q "opencode-antigravity-auth@" /home/dev/.config/opencode/opencode.json 2>/dev/null && \
+       ! grep -q "opencode-antigravity-auth@latest" /home/dev/.config/opencode/opencode.json 2>/dev/null; then
+        echo "Updating opencode-antigravity-auth to latest version..."
+        jq '.plugin |= map(if type == "string" and startswith("opencode-antigravity-auth@") then "opencode-antigravity-auth@latest" else . end)' /home/dev/.config/opencode/opencode.json > /tmp/opencode.json.tmp && mv /tmp/opencode.json.tmp /home/dev/.config/opencode/opencode.json
+        chown dev:dev /home/dev/.config/opencode/opencode.json 2>/dev/null || true
     fi
 fi
 
