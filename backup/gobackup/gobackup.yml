@@ -1,0 +1,35 @@
+# GoBackup config - complementary backup layer (Web UI, archive, notifications)
+# See: https://gobackup.github.io/configuration
+
+web:
+  host: 0.0.0.0
+  port: 2703
+  username: admin
+  password: $GOBACKUP_WEB_PASSWORD
+
+models:
+  unraid_configs:
+    description: "Archive important Unraid configs and compose files"
+    schedule:
+      cron: "0 4 * * *"
+    compress_with:
+      type: tgz
+    archive:
+      includes:
+        - /data/documents/compose
+        - /data/system
+      excludes:
+        - "*.tmp"
+        - "*.log"
+        - node_modules
+        - .git
+    storages:
+      local:
+        type: local
+        keep: 14
+        path: /backups/gobackup
+    notifiers:
+      telegram:
+        type: telegram
+        token: $TELEGRAM_BOT_TOKEN
+        chat_id: $TELEGRAM_CHAT_ID

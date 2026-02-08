@@ -1,153 +1,129 @@
 # Unraid Backup System
 
-Automated backup solution using **Restic** (deduplicated local backups) and **Rclone** (cloud sync to OneDrive + local network PC).
+Automated backup using **Restic** (deduplicated encrypted backups) and **Rclone** (sync to OneDrive + Main PC). Scheduled runs happen inside the stack at 3 AM. **GoBackup** runs alongside as a complementary layer with Web UI and its own schedule.
+
+## How the stack works / when services run
+
+| Service | When it runs | What it does |
+|--------|----------------|--------------|
+| **backup-scheduler** | Always on (`up`). Every minute it checks the time; at **3:00 AM** it runs one full backup (restic → OneDrive sync → Main PC sync) and sends one Telegram report. | Long-lived loop: sleep 60s, at 03:00 run `scheduled-backup.sh`, then sleep again. |
+| **gobackup** | Always on (`up`). Web UI on port **2703**; its own schedule (e.g. 4 AM) is in `gobackup/gobackup.yml`. | Runs in foreground (`gobackup run`); serves Web UI and runs scheduled models. |
+| **restic** | Always on (`up`). No schedule; it just keeps the container alive. | Use **exec** for ad-hoc commands: `docker compose exec restic restic snapshots`, `restic check`, etc. |
+| **rclone** | Always on (`up`). No schedule; container stays alive. | Use **exec** for ad-hoc sync/config: `docker compose exec rclone rclone lsd onedrive:`, etc. |
+| **backup-runner** | Only when you use the `backup` profile: `docker compose --profile backup run --rm backup-runner`. | One-shot: runs `backup.sh` once (restic backup only), then container exits. |
+
+So: **Start the stack with `docker compose up -d`**. That starts the scheduler (3 AM backups), gobackup (Web UI + 4 AM archive), and the restic/rclone containers (for exec). No need to “run” restic or rclone on a schedule—the scheduler does the real work.
 
 ## Features
 
 - **Deduplicated backups** - Restic only stores changed data
-- **Encrypted** - All backups are encrypted with your password
+- **Encrypted** - All backups encrypted with your password
 - **Multi-destination** - Local, OneDrive, and network PC
-- **VM-aware** - Safely shuts down Windows VM before backup
-- **Retention policy** - Automatically cleans old backups
+- **Scheduled in Compose** - No Unraid User Scripts needed; `backup-scheduler` runs nightly at 3 AM
+- **Wide-event Telegram** - One structured message per backup run with full context
+- **GoBackup** - Web UI (port 2703), archive of configs/compose, optional Telegram notifications
+- **Retention policy** - Restic keeps 7 daily, 4 weekly, 6 monthly
 
 ## Directory Structure
 
 ```
 /mnt/user/documents/compose/backup/
 ├── compose.yml           # Docker services
+├── Dockerfile             # backup-scheduler image (restic + rclone)
 ├── .env                   # Passwords and config
-├── rclone.conf            # Rclone remote configs
-├── crontab                # Schedule reference
-├── README.md              # This file
+├── README.md
+├── gobackup/
+│   └── gobackup.yml       # GoBackup config (Web UI, archive model, schedule)
 └── scripts/
-    ├── backup.sh          # Regular directory backup
-    ├── vm-backup.sh       # VM backup with shutdown
-    ├── sync-remotes.sh    # Rclone sync operations
-    └── run-all-backups.sh # Master orchestrator
-
-/mnt/user/backups/
-├── restic/                # Restic repository (encrypted)
-└── logs/                  # Backup logs
+    ├── backup.sh          # Restic directory backup
+    ├── scheduled-backup.sh # Orchestrator for 3 AM run (no VM), wide-event Telegram
+    ├── crontab            # 0 3 * * * for backup-scheduler
+    ├── sync-remotes.sh    # Rclone sync to OneDrive / Main PC
+    ├── vm-backup.sh       # VM backup with shutdown (run via User Scripts if needed)
+    └── run-all-backups.sh # Full manual run (restic + VM + sync, multiple Telegram msgs)
 ```
+
+## Services
+
+| Service | Purpose |
+|--------|---------|
+| **backup-scheduler** | Long-running; runs `scheduled-backup.sh` at 3 AM (restic → OneDrive → Main PC). One Telegram message per run. |
+| **gobackup** | Complementary backups + Web UI at `http://<server>:2703`. Schedule in `gobackup/gobackup.yml` (e.g. 4 AM). |
+| **restic** | Ad-hoc restic commands (snapshots, check, restore). |
+| **rclone** | Ad-hoc rclone commands (sync, config). |
+| **backup-runner** | One-shot restic backup: `docker compose --profile backup run --rm backup-runner`. |
 
 ## What Gets Backed Up
 
-### Regular Backup (Daily)
-- `/mnt/user/appdata` - Docker container data
-- `/mnt/user/documents` - Documents
-- `/mnt/user/domains` - VM configs (excluding disk images)
-- `/mnt/user/system` - System configs
-- `/mnt/user/trilium` - Trilium notes
+### Scheduled backup (3 AM, no VM)
+- Restic: `/mnt/user/appdata` (and other mounted data dirs)
+- Then rclone syncs the restic repo to OneDrive and Main PC
 
-### VM Backup (Daily, with shutdown)
-- `/mnt/user/domains/Windows 10 Enterprise IoT LTSC_v2/vdisk1.img`
+### GoBackup (configurable in `gobackup/gobackup.yml`)
+- Default model `unraid_configs`: archives `compose` + `system` to local storage (tgz), keep 14, run at 4 AM
 
-### Excluded (large media)
-- `/mnt/user/media`
-- `/mnt/user/music`
-- `/mnt/user/isos`
-- `/mnt/user/podcasts`
-- `/mnt/user/downloads`
+### VM backup (optional)
+- Use **User Scripts** to run `./scripts/run-all-backups.sh` (includes VM shutdown) or `./scripts/vm-backup.sh` alone.
 
+## Required setup
 
-## REQUIRED SETUP.
+1. **Rclone**: generate config (e.g. `docker compose run --rm rclone config`) and put `rclone.conf` in `config/`.
+2. **.env**: set at least:
+   - `RESTIC_PASSWORD`
+   - `MAINPC_HOST`, `MAINPC_USER`, `MAINPC_PATH`, `ONEDRIVE_PATH`
+   - `TELEGRAM_ENABLED`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (for wide-event report)
+   - `GOBACKUP_WEB_PASSWORD` (for GoBackup Web UI; username: admin)
 
-generate config with rclone. and setup envs in .env
-
-RESTIC_PASSWORD
-MAINPC_HOST
-MAINPC_USER
-MAINPC_PATH
-MAINPC_PORT
-ONEDRIVE_PATH
-VM_NAME
-TELEGRAM_ENABLED
-TELEGRAM_BOT_TOKEN
-TELEGRAM_CHAT_ID
-
-## Common Commands
+## Common commands
 
 ```bash
 cd /mnt/user/documents/compose/backup
 
-# Run full backup manually
-./scripts/run-all-backups.sh
+# Build backup-scheduler image (use legacy builder if compose build fails with buildx)
+./build-scheduler.sh
 
-# Run backup without VM shutdown
-./scripts/run-all-backups.sh --no-vm
+# Start the stack (scheduler + gobackup + restic/rclone for ad-hoc use)
+docker compose up -d
 
-# Run backup without remote sync
-./scripts/run-all-backups.sh --no-sync
+# Run scheduled backup once by hand (inside scheduler)
+docker compose exec backup-scheduler /scripts/scheduled-backup.sh
 
-
-# cd /mnt/user/documents/compose/backup
-# List all snapshots
-
-docker compose run --rm restic snapshots
+# List restic snapshots (restic container is already running)
+docker compose exec restic restic snapshots
 
 # Check repository health
-docker compose run --rm restic check
+docker compose exec restic restic check
 
-# Show repository stats
-docker compose run --rm restic stats
+# One-shot full backup including VM (multiple Telegram messages)
+./scripts/run-all-backups.sh
 
-# Restore a file
-docker compose run --rm restic restore latest --target /restore --include "/data/documents/important.txt"
-
-# Test rclone connection
-docker compose run --rm rclone lsd onedrive:
-docker compose run --rm rclone lsd mainpc:
+# GoBackup Web UI
+# Open http://<unraid-ip>:2703 (admin / GOBACKUP_WEB_PASSWORD)
 ```
 
-## Restoring Backups
+## Logs
 
-### Restore from Local Restic Repository
+- **Scheduled backup**: inside `backup-scheduler` at `/var/log/backup/` (volume `backup-logs`). To tail:  
+  `docker compose exec backup-scheduler tail -f /var/log/backup/cron.log`
+- **GoBackup**: check the Web UI or container logs.
+
+## Restoring
+
+### From local Restic repo
 
 ```bash
-# List available snapshots
-docker compose run --rm restic snapshots
-
-# Restore specific snapshot to /mnt/user/restore
-docker compose run --rm -v /mnt/user/restore:/restore restic restore <snapshot-id> --target /restore
-
-# Restore specific files
-docker compose run --rm -v /mnt/user/restore:/restore restic restore latest --target /restore --include "/data/documents/"
+docker compose exec restic restic snapshots
+# Restore (run a one-off container with a restore mount)
+docker compose run --rm -v /mnt/user/restore:/restore restic restic restore <snapshot-id> --target /restore
 ```
 
-### Restore from OneDrive
-
-If your local backup is lost, you can restore from OneDrive:
+### From OneDrive
 
 ```bash
-# Sync back from OneDrive
-docker compose run --rm rclone sync onedrive:Backups/unraid /backup
-
-# Then restore from the synced repository
-docker compose run --rm restic snapshots
+docker compose exec rclone rclone sync onedrive:Backups/unraid /backup
+docker compose exec restic restic snapshots
 ```
 
-## Retention Policy
+## Retention (Restic)
 
-Restic automatically keeps:
-- **7 daily** snapshots
-- **4 weekly** snapshots  
-- **6 monthly** snapshots
-
-
-## Troubleshooting
-
-### "Repository not found" error
-Run `docker compose run --rm restic init` to initialize.
-
-### VM doesn't shut down
-Check the VM name matches exactly:
-```bash
-virsh list --all
-```
-Update `VM_NAME` in `.env` if needed.
-
-
-### Check logs
-```bash
-cat /mnt/user/backups/logs/backup-*.log | tail -100
-```
+- 7 daily, 4 weekly, 6 monthly (prune runs after each backup).

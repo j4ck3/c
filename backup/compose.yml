@@ -1,8 +1,70 @@
 services:
+  # ---------------------------------------------------------------------------
+  # Primary: scheduled restic + rclone backups (nightly 3 AM, wide-event Telegram)
+  # ---------------------------------------------------------------------------
+  backup-scheduler:
+    image: backup-scheduler:latest
+    container_name: backup-scheduler
+    restart: unless-stopped
+    environment:
+      - RESTIC_REPOSITORY=/repo
+      - RESTIC_PASSWORD=${RESTIC_PASSWORD}
+      - RCLONE_CONFIG=/config/rclone.conf
+      - ONEDRIVE_PATH=${ONEDRIVE_PATH:-Backups/unraid}
+      - MAINPC_PATH=${MAINPC_PATH:-/home/user/backups/unraid}
+      - TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-false}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    volumes:
+      - /mnt/cache/backups/restic:/repo
+      - /mnt/cache/backups/restic:/backup
+      - /mnt/user/appdata:/data/appdata:ro
+      - /mnt/user/documents:/data/documents:ro
+      - /mnt/user/system:/data/system:ro
+      - /mnt/user/trilium:/data/trilium:ro
+      - ./scripts:/scripts:ro
+      - ./config:/config:ro
+      - /root/.ssh:/root/.ssh:ro
+      - restic-cache:/root/.cache/restic
+      - backup-logs:/var/log/backup
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        mkdir -p /var/log/backup
+        while true; do
+          if [ "$$(date +%H:%M)" = "03:00" ] && [ "$$(date +%Y-%m-%d)" != "$$(cat /var/log/backup/last_run 2>/dev/null)" ]; then
+            /scripts/scheduled-backup.sh >> /var/log/backup/cron.log 2>&1
+            date +%Y-%m-%d > /var/log/backup/last_run
+          fi
+          sleep 60
+        done
+
+  # ---------------------------------------------------------------------------
+  # Complementary: GoBackup (Web UI, archive configs, own schedule + Telegram)
+  # ---------------------------------------------------------------------------
+  gobackup:
+    image: huacnlee/gobackup:latest
+    container_name: gobackup
+    restart: unless-stopped
+    ports:
+      - "2703:2703"
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - GOBACKUP_WEB_PASSWORD=${GOBACKUP_WEB_PASSWORD}
+    volumes:
+      - ./gobackup:/etc/gobackup
+      - /mnt/user/documents:/data/documents:ro
+      - /mnt/user/system:/data/system:ro
+      - /mnt/cache/backups/gobackup:/backups/gobackup
+    command: ["gobackup", "run", "--config", "/etc/gobackup/gobackup.yml"]
+
   restic:
     image: instrumentisto/restic:latest
     container_name: restic
     restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["sleep infinity"]
     environment:
       - RESTIC_REPOSITORY=/repo
       - RESTIC_PASSWORD=${RESTIC_PASSWORD}
@@ -21,6 +83,8 @@ services:
     image: rclone/rclone:latest
     container_name: rclone
     restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["sleep infinity"]
     environment:
       - RCLONE_CONFIG=/config/rclone.conf
       - ONEDRIVE_PATH=${ONEDRIVE_PATH:-Backups/unraid}
@@ -61,4 +125,6 @@ services:
 volumes:
   restic-cache:
     name: restic-cache
+  backup-logs:
+    name: backup-logs
 

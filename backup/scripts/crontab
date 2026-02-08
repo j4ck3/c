@@ -1,0 +1,2 @@
+# Run backup nightly at 3 AM
+0 3 * * * /scripts/scheduled-backup.sh >> /var/log/backup/cron.log 2>&1

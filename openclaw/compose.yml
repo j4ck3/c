@@ -6,6 +6,8 @@ services:
     environment:
       - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - HA_URL=${HA_URL}
+      - HA_TOKEN=${HA_TOKEN}
     volumes:
       - /mnt/user/appdata/openclaw/config:/home/openclaw/.openclaw
       - /mnt/user/appdata/openclaw/workspace:/home/openclaw/workspace

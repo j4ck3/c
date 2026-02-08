@@ -21,8 +21,10 @@ set -e
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-# Try cache path first (preferred), then user path
-if [ -d "/mnt/cache/backups/restic" ]; then
+# In Docker (e.g. backup-scheduler) repo is mounted at /backup
+if [ -f /.dockerenv ] && [ -d "/backup" ]; then
+    BACKUP_SOURCE="/backup"
+elif [ -d "/mnt/cache/backups/restic" ]; then
     BACKUP_SOURCE="/mnt/cache/backups/restic"
 elif [ -d "/mnt/user/backups/restic" ]; then
     BACKUP_SOURCE="/mnt/user/backups/restic"
@@ -30,17 +32,19 @@ else
     BACKUP_SOURCE="/mnt/user/backups/restic"  # Default, will fail with clear error
 fi
 
-# Try to find rclone.conf in common locations
-if [ -f "/mnt/cache/documents/compose/backup/config/rclone.conf" ]; then
-    RCLONE_CONFIG="/mnt/cache/documents/compose/backup/config/rclone.conf"
-elif [ -f "/mnt/user/documents/compose/backup/config/rclone.conf" ]; then
-    RCLONE_CONFIG="/mnt/user/documents/compose/backup/config/rclone.conf"
-elif [ -f "/mnt/cache/documents/compose/backup/rclone.conf" ]; then
-    RCLONE_CONFIG="/mnt/cache/documents/compose/backup/rclone.conf"
-elif [ -f "/mnt/user/documents/compose/backup/rclone.conf" ]; then
-    RCLONE_CONFIG="/mnt/user/documents/compose/backup/rclone.conf"
-else
-    RCLONE_CONFIG="/mnt/user/documents/compose/backup/config/rclone.conf"  # Default
+# Use RCLONE_CONFIG from env if set and valid; otherwise find rclone.conf
+if [ -z "$RCLONE_CONFIG" ] || [ ! -f "$RCLONE_CONFIG" ]; then
+    if [ -f "/mnt/cache/documents/compose/backup/config/rclone.conf" ]; then
+        RCLONE_CONFIG="/mnt/cache/documents/compose/backup/config/rclone.conf"
+    elif [ -f "/mnt/user/documents/compose/backup/config/rclone.conf" ]; then
+        RCLONE_CONFIG="/mnt/user/documents/compose/backup/config/rclone.conf"
+    elif [ -f "/mnt/cache/documents/compose/backup/rclone.conf" ]; then
+        RCLONE_CONFIG="/mnt/cache/documents/compose/backup/rclone.conf"
+    elif [ -f "/mnt/user/documents/compose/backup/rclone.conf" ]; then
+        RCLONE_CONFIG="/mnt/user/documents/compose/backup/rclone.conf"
+    else
+        RCLONE_CONFIG="/mnt/user/documents/compose/backup/config/rclone.conf"  # Default
+    fi
 fi
 
 # Remote destinations (must match names in rclone.conf)
