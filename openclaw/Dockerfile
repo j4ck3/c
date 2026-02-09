@@ -16,7 +16,13 @@ RUN pacman -Syu --noconfirm && \
         base-devel \
         curl \
         unzip \
+        chromium \
     && pacman -Scc --noconfirm
+
+# agent-browser for web automation (uses system Chromium)
+RUN npm install -g agent-browser
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Install Bun (used as package manager and build runner)
 RUN curl -fsSL https://bun.sh/install | bash
@@ -25,11 +31,24 @@ ENV PATH="/root/.bun/bin:${PATH}"
 # Install pnpm (needed by OpenClaw build scripts internally)
 RUN npm install -g pnpm
 
-# Clone and build OpenClaw
+# Optional: pass --build-arg GITHUB_TOKEN=ghp_xxx to avoid 429 rate limits when
+# fetching git deps (e.g. libsignal-node). Or retry the build in a few minutes.
+ARG GITHUB_TOKEN
+RUN if [ -n "$GITHUB_TOKEN" ]; then git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; fi
+
+# Clone and build OpenClaw (retry on GitHub 500/429)
 WORKDIR /app
-RUN git clone --depth 1 https://github.com/openclaw/openclaw.git .
-RUN bun install
+RUN for i in 1 2 3 4 5; do \
+    rm -rf /app/.git /app/.[!.]* /app/* 2>/dev/null; \
+    git clone --depth 1 https://github.com/openclaw/openclaw.git . && break; \
+    echo "Clone attempt $$i failed, retrying in 45s..."; sleep 45; \
+  done && test -f /app/package.json
+# Pass token into bun install so git deps (e.g. libsignal-node) get higher rate limit
+RUN GITHUB_TOKEN=${GITHUB_TOKEN} bun install
 RUN bun run build
+
+# Add agent-browser skill so OpenClaw finds it at /app/skills/agent-browser/SKILL.md
+COPY skills/agent-browser /app/skills/agent-browser
 
 # Create non-root user for runtime
 RUN useradd -m -u 1000 -s /bin/bash openclaw && \

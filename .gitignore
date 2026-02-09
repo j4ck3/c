@@ -1,6 +1,7 @@
 .env
 *.log
 traefik/certs/
+openclaw/website_credentials.json
 
 # Traefik ACME certificates (contains private keys)
 traefik/acme/

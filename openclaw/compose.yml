@@ -8,9 +8,12 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - HA_URL=${HA_URL}
       - HA_TOKEN=${HA_TOKEN}
+      - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+      - AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
     volumes:
       - /mnt/user/appdata/openclaw/config:/home/openclaw/.openclaw
       - /mnt/user/appdata/openclaw/workspace:/home/openclaw/workspace
+      - /mnt/user/documents/compose/openclaw/website_credentials.json:/home/openclaw/.openclaw/secrets/website_credentials.json:ro
     networks:
       - npm_services
     labels:

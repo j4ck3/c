@@ -3,5 +3,14 @@
     "**/.git": true,
     "**/.DS_Store": true
   },
-  "explorer.excludeGitIgnore": false
+  "explorer.excludeGitIgnore": false,
+  "terminal.integrated.env.linux": {
+    "COMPOSE_PROGRESS": "plain"
+  },
+  "terminal.integrated.env.osx": {
+    "COMPOSE_PROGRESS": "plain"
+  },
+  "terminal.integrated.env.windows": {
+    "COMPOSE_PROGRESS": "plain"
+  }
 }

@@ -101,22 +101,29 @@ STEP2_END=$(date +%s)
 STEP2_DURATION=$((STEP2_END - STEP2_START))
 
 # -----------------------------------------------------------------------------
-# Step 3: Rclone sync to Main PC
+# Step 3: Rclone sync to Main PC (optional; set SYNC_MAINPC_SCHEDULED=true to enable)
+# Manual sync: docker compose exec backup-scheduler /scripts/sync-remotes.sh mainpc
 # -----------------------------------------------------------------------------
 echo ""
 echo "=============================================="
 echo "  Step 3: Main PC Sync"
 echo "=============================================="
 STEP3_START=$(date +%s)
-STEP3_OUTPUT="${LOG_DIR}/step3.$$.log"
-if /bin/bash /scripts/sync-remotes.sh mainpc 2>&1 | tee "$STEP3_OUTPUT"; then
-    STEP3_STATUS="OK"
+if [ "${SYNC_MAINPC_SCHEDULED:-false}" = "true" ]; then
+    STEP3_OUTPUT="${LOG_DIR}/step3.$$.log"
+    if /bin/bash /scripts/sync-remotes.sh mainpc 2>&1 | tee "$STEP3_OUTPUT"; then
+        STEP3_STATUS="OK"
+    else
+        STEP3_STATUS="FAILED"
+        STEP3_DETAIL=$(tail -3 "$STEP3_OUTPUT" 2>/dev/null | tr '\n' ' ' || echo "see log")
+        ((ERROR_COUNT++)) || true
+    fi
+    rm -f "$STEP3_OUTPUT"
 else
-    STEP3_STATUS="FAILED"
-    STEP3_DETAIL=$(tail -3 "$STEP3_OUTPUT" 2>/dev/null | tr '\n' ' ' || echo "see log")
-    ((ERROR_COUNT++)) || true
+    echo "Skipped (SYNC_MAINPC_SCHEDULED not true). Run manually: /scripts/sync-remotes.sh mainpc"
+    STEP3_STATUS="SKIPPED"
+    STEP3_DETAIL=""
 fi
-rm -f "$STEP3_OUTPUT"
 STEP3_END=$(date +%s)
 STEP3_DURATION=$((STEP3_END - STEP3_START))
 
@@ -127,10 +134,11 @@ END_TIME=$(date +%s)
 TOTAL_DURATION=$((END_TIME - START_TIME))
 TOTAL_MIN=$((TOTAL_DURATION / 60))
 TOTAL_SEC=$((TOTAL_DURATION % 60))
+STEPS_RUN=$([ "${SYNC_MAINPC_SCHEDULED:-false}" = "true" ] && echo "3" || echo "2")
 if [ $ERROR_COUNT -eq 0 ]; then
     OVERALL_STATUS="OK"
 else
-    OVERALL_STATUS="ERRORS ($ERROR_COUNT/3 steps)"
+    OVERALL_STATUS="ERRORS ($ERROR_COUNT/${STEPS_RUN} steps)"
 fi
 
 REPORT="BACKUP REPORT | ${REPORT_HOST}
@@ -150,7 +158,7 @@ Log: $(basename "$LOG_FILE")"
 echo ""
 echo "=============================================="
 echo "  Scheduled backup finished: $(date)"
-echo "  Duration: ${TOTAL_MIN}m ${TOTAL_SEC}s | Errors: ${ERROR_COUNT}/3"
+echo "  Duration: ${TOTAL_MIN}m ${TOTAL_SEC}s | Errors: ${ERROR_COUNT}/${STEPS_RUN}"
 echo "=============================================="
 
 telegram_send "$REPORT"

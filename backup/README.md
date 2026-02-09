@@ -56,8 +56,8 @@ So: **Start the stack with `docker compose up -d`**. That starts the scheduler (
 ## What Gets Backed Up
 
 ### Scheduled backup (3 AM, no VM)
-- Restic: `/mnt/user/appdata` (and other mounted data dirs)
-- Then rclone syncs the restic repo to OneDrive and Main PC
+- Restic: `/mnt/user/appdata`, `/mnt/user/documents`, `/mnt/user/system`, `/mnt/user/trilium`
+- Then rclone syncs the restic repo to OneDrive (and Main PC if `SYNC_MAINPC_SCHEDULED=true`)
 
 ### GoBackup (configurable in `gobackup/gobackup.yml`)
 - Default model `unraid_configs`: archives `compose` + `system` to local storage (tgz), keep 14, run at 4 AM
@@ -71,6 +71,7 @@ So: **Start the stack with `docker compose up -d`**. That starts the scheduler (
 2. **.env**: set at least:
    - `RESTIC_PASSWORD`
    - `MAINPC_HOST`, `MAINPC_USER`, `MAINPC_PATH`, `ONEDRIVE_PATH`
+   - `SYNC_MAINPC_SCHEDULED` (default `false`; set `true` to include Main PC sync in 3 AM run)
    - `TELEGRAM_ENABLED`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (for wide-event report)
    - `GOBACKUP_WEB_PASSWORD` (for GoBackup Web UI; username: admin)
 
@@ -93,6 +94,10 @@ docker compose exec restic restic snapshots
 
 # Check repository health
 docker compose exec restic restic check
+
+# Manual sync to Main PC (when PC is on; 3 AM run skips this unless SYNC_MAINPC_SCHEDULED=true)
+docker compose exec backup-scheduler /scripts/sync-remotes.sh mainpc
+# Or from rclone container: docker compose exec rclone /scripts/sync-remotes.sh mainpc
 
 # One-shot full backup including VM (multiple Telegram messages)
 ./scripts/run-all-backups.sh

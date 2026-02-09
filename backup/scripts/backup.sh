@@ -57,8 +57,7 @@ run_backup() {
     log_info "Starting backup of regular directories..."
     
     # Directories to backup (relative to /data mount point)
-    # TESTING: Only appdata for now
-    BACKUP_DIRS="/data/appdata"
+    BACKUP_DIRS="/data/appdata /data/documents /data/system /data/trilium"
     
     # Build exclude arguments
     EXCLUDE_ARGS=""
