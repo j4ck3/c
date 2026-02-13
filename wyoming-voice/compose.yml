@@ -1,0 +1,32 @@
+# Wyoming protocol voice stack: Whisper (STT) + Piper (TTS)
+# For Home Assistant: Settings → Devices & Services → Add Integration → Wyoming
+# Add each service by hostname and port (whisper: 10300, piper: 10200).
+
+services:
+  wyoming-whisper:
+    image: rhasspy/wyoming-whisper:latest
+    container_name: wyoming-whisper
+    restart: unless-stopped
+    ports:
+      - "10300:10300"
+    volumes:
+      - /mnt/user/appdata/wyoming-voice/whisper-data:/data
+    environment:
+      - CUDA_VISIBLE_DEVICES=""
+    command:
+      - "--model"
+      - "medium-int8"
+      - "--language"
+      - "en"
+
+  wyoming-piper:
+    image: rhasspy/wyoming-piper:latest
+    container_name: wyoming-piper
+    restart: unless-stopped
+    ports:
+      - "10200:10200"
+    volumes:
+      - /mnt/user/appdata/wyoming-voice/piper-data:/data
+    command:
+      - "--voice"
+      - "en_US-lessac-medium"

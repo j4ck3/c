@@ -8,11 +8,13 @@ services:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
+    expose:
+      - "8080"  # SearXNG
     ports:
       - 8881:8888/tcp # HTTP proxy
       - 8381:8388/tcp # Shadowsocks
       - 8381:8388/udp # Shadowsocks
-      - 9393:8080/tcp # SearXNG
+      - 9393:8080/tcp # SearXNG (host access)
     volumes:
       - /mnt/user/appdata/searxng/gluetun:/gluetun
     environment:
@@ -26,12 +28,22 @@ services:
     networks:
       - docker0
       - npm_services
+    healthcheck:
+      test: ["CMD", "ping", "-c", "1", "1.1.1.1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=npm_services"
       - "traefik.http.routers.searxng.rule=Host(`searxng.hjacke.com`)"
       - "traefik.http.routers.searxng.entrypoints=websecure"
       - "traefik.http.routers.searxng.tls=true"
+      - "traefik.http.routers.searxng.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.searxng.service=searxng"
       - "traefik.http.services.searxng.loadbalancer.server.port=8080"
+      - "traefik.http.services.searxng.loadbalancer.server.scheme=http"
 
   searxng:
     image: searxng/searxng:latest
