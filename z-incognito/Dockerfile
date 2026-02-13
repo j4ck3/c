@@ -1,6 +1,11 @@
 # Custom Neko Chromium with Intel VAAPI support and fingerprint hardening
 FROM ghcr.io/m1k1o/neko/intel-chromium:latest
 
+# Clear stale X lock/socket at startup so x-server can start after container restarts
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+
 # Add bookworm repos for newer Intel drivers
 RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" >> /etc/apt/sources.list.d/bookworm.list && \
     echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list.d/bookworm.list
