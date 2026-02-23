@@ -1,0 +1,45 @@
+services:
+  test-edlundfia-se:
+    image: registry.gitlab.com/j4ck3-group/mammas-hemsida
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    hostname: test.edlundfia.se
+    volumes:
+      - ./.env:/app/.env:ro
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # Convex URLs (Node server talks to Convex for auth/API)
+      # Server-side Convex client needs CONVEX_URL (same as VITE_CONVEX_URL)
+      CONVEX_URL: ${VITE_CONVEX_URL}
+      VITE_CONVEX_URL: ${VITE_CONVEX_URL}
+      VITE_SITE_URL: ${VITE_SITE_URL}
+      VITE_CONVEX_SITE_URL: ${VITE_CONVEX_SITE_URL}
+      # Cloudinary (product image uploads – /api/cloudinary/sign)
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_UPLOAD_PRESET_1: ${CLOUDINARY_UPLOAD_PRESET_1}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      # Contact form (Resend – server-side in src/lib/contact-server-fn.ts)
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-}
+      CONTACT_EMAIL: ${CONTACT_EMAIL}
+    networks:
+      - default
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.mammas-hemsida.rule=Host(`test.edlundfia.se`)"
+      - "traefik.http.routers.mammas-hemsida.entrypoints=websecure"
+      - "traefik.http.routers.mammas-hemsida.tls=true"
+      - "traefik.http.routers.mammas-hemsida.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.mammas-hemsida.service=mammas-hemsida"
+      - "traefik.http.services.mammas-hemsida.loadbalancer.server.port=3000"
+
+networks:
+  default: {}
+  traefik:
+    external: true

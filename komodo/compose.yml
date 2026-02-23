@@ -1,0 +1,94 @@
+# Komodo - build and deploy software across many servers
+# https://github.com/moghtech/komodo
+#
+# First-time setup: clone the repo into ./app then run:
+#   docker compose up -d --build
+#
+# Or: ./setup.sh  (clones repo into ./app and builds)
+
+services:
+  core:
+    build:
+      context: ./app
+      dockerfile: bin/core/aio.Dockerfile
+    restart: unless-stopped
+    logging:
+      driver: local
+    ports:
+      - "9120:9120"
+    networks:
+      - default
+      - npm_services
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.komodo.rule=Host(`komodo.hjacke.com`)"
+      - "traefik.http.routers.komodo.entrypoints=websecure"
+      - "traefik.http.routers.komodo.tls=true"
+      - "traefik.http.routers.komodo.tls.certresolver=letsencrypt"
+      - "traefik.http.services.komodo.loadbalancer.server.port=9120"
+    environment:
+      KOMODO_HOST: https://komodo.hjacke.com
+      KOMODO_FIRST_SERVER: https://periphery:8120
+      KOMODO_DATABASE_ADDRESS: ferretdb
+      KOMODO_ENABLE_NEW_USERS: "true"
+      KOMODO_LOCAL_AUTH: "true"
+      KOMODO_JWT_SECRET: ${KOMODO_JWT_SECRET:-change-me-in-production}
+      # Optional: create admin on first start when no users exist (set in .env)
+      KOMODO_INIT_ADMIN_USERNAME: ${KOMODO_INIT_ADMIN_USERNAME:-}
+      KOMODO_INIT_ADMIN_PASSWORD: ${KOMODO_INIT_ADMIN_PASSWORD:-}
+      # Debug auth/signup errors (set to "info" in production)
+      KOMODO_LOGGING_LEVEL: ${KOMODO_LOGGING_LEVEL:-debug}
+    volumes:
+      - repo-cache:/repo-cache
+    depends_on:
+      - ferretdb
+      - periphery
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:9120/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  periphery:
+    build:
+      context: ./app
+      dockerfile: bin/periphery/aio.Dockerfile
+    restart: unless-stopped
+    logging:
+      driver: local
+    networks:
+      - default
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /proc:/proc
+      - repos:/etc/komodo/repos
+      - stacks:/etc/komodo/stacks
+    environment:
+      PERIPHERY_INCLUDE_DISK_MOUNTS: /etc/hostname
+
+  ferretdb:
+    image: ghcr.io/ferretdb/ferretdb:1
+    restart: unless-stopped
+    logging:
+      driver: local
+    networks:
+      - default
+    environment:
+      FERRETDB_HANDLER: sqlite
+    volumes:
+      - ferretdb-data:/state
+
+networks:
+  default: {}
+  npm_services:
+    external: true
+  traefik:
+    external: true
+
+volumes:
+  ferretdb-data:
+  repo-cache:
+  repos:
+  stacks:

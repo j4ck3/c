@@ -1,0 +1,21 @@
+# komodo.hjacke.com -> Komodo Core (build/deploy UI)
+# Same host: core is on network "traefik", so Traefik reaches it at komodo-core-1:9120.
+# Different host: use file with url "http://OTHER_HOST_IP:9120" instead.
+#
+http:
+  routers:
+    komodo:
+      rule: "Host(`komodo.hjacke.com`)"
+      entryPoints:
+        - websecure
+      service: komodo
+      tls:
+        certResolver: letsencrypt
+  services:
+    komodo:
+      loadBalancer:
+        servers:
+          - url: "http://komodo-core-1:9120"
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: 1ns

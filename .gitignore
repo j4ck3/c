@@ -15,3 +15,5 @@ backup/config/rclone.conf
 opencode-config/
 opencode-cache/
 opencode-data/
+
+komodo/app/
