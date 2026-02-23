@@ -8,9 +8,24 @@ Forward these ports from your public IP to **Traefik** (10.0.0.25):
 
 | External (router) | Forward to        | Purpose                    |
 |-------------------|-------------------|----------------------------|
-| TCP 443           | 10.0.0.25:443     | HTTPS (Gitea, registry)    |
+| TCP 22            | 10.0.0.25:22      | **Git over SSH** (clone/push) |
 | TCP 80            | 10.0.0.25:80      | HTTP → HTTPS + ACME challenge |
-| TCP 22 (optional) | 10.0.0.25:22      | Git over SSH               |
+| TCP 443           | 10.0.0.25:443     | HTTPS (Gitea, registry)    |
+
+**Git over SSH (from tower/host):** Gitea’s SSH is on **host port 2222**. On the tower, `/etc/hosts` has `127.0.0.1 gitea.hjacke.com`, so use the URL **with port 2222**:
+
+- Clone: `git clone git@gitea.hjacke.com:2222/j4ck3/mammas-hemsida.git`
+- Remote: `git remote set-url origin git@gitea.hjacke.com:2222/j4ck3/mammas-hemsida.git`
+
+Add your SSH public key in Gitea: **Settings → SSH / GPG Keys**. For access from outside the tower, forward router **TCP 2222** to **tower IP:2222**.
+
+**If you get "Internal Server Connection Error" on pull/push:** add keepalives and (if you use LFS) try skipping LFS once to see if LFS is the cause:
+- In `~/.ssh/config` for `Host gitea.hjacke.com` add:
+  ```
+  ServerAliveInterval 30
+  ServerAliveCountMax 6
+  ```
+- Test without LFS: `GIT_LFS_SKIP_SMUDGE=1 git pull origin master`. If that works, the problem is likely LFS (e.g. LFS over HTTPS failing); you can keep using `GIT_LFS_SKIP_SMUDGE=1` for pulls or fix LFS URL/auth.
 
 For the **runner** (on the same host) to reach the registry at `gitea.hjacke.com`, the host will connect to your **public IP**. The router must support **NAT hairpinning** (same-LAN device connecting to public IP and being forwarded back). If your router does not support it, see “Fallback: registry on localhost” below.
 
@@ -20,18 +35,22 @@ For the **runner** (on the same host) to reach the registry at `gitea.hjacke.com
 
 | Secret             | Value              | Notes                                      |
 |--------------------|--------------------|--------------------------------------------|
-| **REGISTRY**       | `gitea.hjacke.com` | No `https://`, no port, no trailing slash  |
+| **REGISTRY**       | `127.0.0.1:3002`   | So the host's Docker daemon reaches Gitea (avoids 404 on /v2/ when using gitea.hjacke.com:80) |
 | **REGISTRY_USERNAME** | Your Gitea username | Or a bot/user for automation               |
 | **REGISTRY_PASSWORD** | Gitea password or PAT | Use PAT if 2FA is enabled              |
 
-### Workflow: use HTTPS (no insecure registry)
+### Workflow: use HTTP for 127.0.0.1:3002
 
-With the registry at `gitea.hjacke.com` over HTTPS, **remove** the `config-inline` block from the “Set up Docker Buildx” step so Docker uses HTTPS:
+With **REGISTRY=127.0.0.1:3002**, keep the **config-inline** in the “Set up Docker Buildx” step so Docker uses HTTP and accepts the insecure registry:
 
 ```yaml
 - name: Set up Docker Buildx
   uses: docker/setup-buildx-action@v3
-  # For HTTPS registry (gitea.hjacke.com), do NOT use config-inline with http = true
+  with:
+    config-inline: |
+      [registry."${{ secrets.REGISTRY }}"]
+        http = true
+        insecure = true
 ```
 
 Keep the login step using the secret:
@@ -47,7 +66,7 @@ Keep the login step using the secret:
 
 ### Runner env (already in `runner-config.yaml`)
 
-- **GITEA_REGISTRY** = `gitea.hjacke.com` (so jobs can use `${{ env.GITEA_REGISTRY }}` if you prefer that over the secret).
+- **GITEA_REGISTRY** = `127.0.0.1:3002` (so jobs can use `${{ env.GITEA_REGISTRY }}`; matches REGISTRY secret).
 
 ## 3. Gitea / Traefik config (already set)
 

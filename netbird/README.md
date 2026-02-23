@@ -42,11 +42,11 @@ WireGuard-based mesh VPN: management, signal, relay, and embedded STUN in a comb
 
 ## Troubleshooting: dashboard does not load
 
-- **Domain must hit Traefik**  
-  Your Traefik runs on a dedicated IP (e.g. `10.0.0.25`). Ensure `netbird.hjacke.com` (or your domain) resolves to that IP. If it resolves to the host’s main IP, the request may hit another reverse proxy (e.g. Nginx Proxy Manager) that has no route for Netbird.
+- **Use the same IP as your other services (e.g. Gitea)**  
+  Your Traefik runs on a dedicated IP (e.g. `10.0.0.25`). Ensure `netbird.hjacke.com` (or your domain) resolves to that IP. If netbird.hjacke.com resolves to 10.0.0.25 but gitea.hjacke.com uses 83.255.200.238, point netbird to 83.255.200.238 and add a proxy for netbird in NPM. If it resolves to the host’s main IP, the request may hit another reverse proxy (e.g. Nginx Proxy Manager) that has no route for Netbird.
 
 - **Test via port 8080**  
-  Open `http://<server-ip>:8080`. If the dashboard UI loads there but not via the domain, fix DNS so the domain points to the Traefik IP.
+  Open `http://<server-ip>:8080`. If the dashboard UI loads there but not via the domain, the domain is not reaching the right proxy (see above).
 
 - **Stuck on loading spinner**  
   Open DevTools → Network (F12). Reload and check for failed requests to `/api/...` or `/oauth2/...`. If those return 404/502, Traefik may be sending them to the wrong service; ensure netbird-server routers have **priority=10** and netbird-dashboard has **priority=1** in `docker-compose.yml`.

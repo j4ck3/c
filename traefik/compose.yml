@@ -20,7 +20,10 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
     # No ports needed - macvlan gives Traefik its own IP (10.0.0.25).
-    # Forward router: public IP 80/443 → 10.0.0.25:80 and 10.0.0.25:443 so gitea.hjacke.com works.
+    # Forward on router so gitea.hjacke.com works:
+    #   TCP 22  → 10.0.0.25:22  (Git SSH)
+    #   TCP 80  → 10.0.0.25:80  (HTTP + ACME)
+    #   TCP 443 → 10.0.0.25:443 (HTTPS)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /mnt/user/documents/compose/traefik/certs:/etc/traefik/certs:ro

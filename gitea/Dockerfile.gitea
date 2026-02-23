@@ -1,0 +1,10 @@
+# Add socat so we can listen on 3002 inside the container and forward to 3000.
+# That way LOCAL_ROOT_URL=http://127.0.0.1:3002/ works for both (1) registry token
+# and (2) git shell internal callback.
+FROM gitea/gitea:latest
+USER root
+RUN apk add --no-cache socat
+COPY entrypoint-with-socat.sh /usr/bin/entrypoint-with-socat.sh
+RUN chmod +x /usr/bin/entrypoint-with-socat.sh
+# Keep root so original entrypoint (s6) can create lock files; it switches to git for Gitea
+ENTRYPOINT ["/usr/bin/entrypoint-with-socat.sh"]

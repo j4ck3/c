@@ -1,10 +1,13 @@
 services:
   server:
-    image: gitea/gitea:latest
+    # Custom image with socat so LOCAL_ROOT_URL=127.0.0.1:3002 works for registry + git shell. Rebuild: docker build -f Dockerfile.gitea -t gitea-local:socat .
+    image: gitea-local:socat
     container_name: gitea
     ports:
-      # Optional: host port 3002 for direct access / fallback registry (e.g. if NAT hairpin fails)
-      - "127.0.0.1:3002:3000"
+      # Host 3002 -> container 3002 (socat) -> 3000 (Gitea)
+      - "127.0.0.1:3002:3002"
+      # Git over SSH: host 2222 -> Gitea 22. Host can't reach 10.0.0.25 (macvlan). Forward router 2222 -> host:2222.
+      - "2222:22"
     environment:
       - USER_UID=1000
       - USER_GID=1000
@@ -12,9 +15,12 @@ services:
       - GITEA__server__ROOT_URL=https://${GITEA_DOMAIN:-gitea.hjacke.com}/
       # Use HTTP internally; Traefik (reverse proxy) terminates HTTPS at gitea.hjacke.com
       - GITEA__server__PROTOCOL=http
-      # SSH clone/push: Traefik listens on port 22 and forwards here
+      # Registry token + git shell callback (socat in container listens on 3002 → 3000)
+      - GITEA__server__LOCAL_ROOT_URL=http://127.0.0.1:3002/
+      # SSH: port 2222 (host can't reach 10.0.0.25). Clone URL: git@gitea.hjacke.com:2222/user/repo.git
       - GITEA__server__SSH_DOMAIN=${GITEA_DOMAIN:-gitea.hjacke.com}
-      - GITEA__server__SSH_PORT=22
+      - GITEA__server__SSH_PORT=2222
+      - GITEA__server__SSH_LISTEN_PORT=22
       - GITEA__database__DB_TYPE=postgres
       - GITEA__database__HOST=db:5432
       - GITEA__database__NAME=gitea
