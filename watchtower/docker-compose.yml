@@ -7,7 +7,7 @@ services:
     environment:
       - DOCKER_API_VERSION=1.44
       - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_POLL_INTERVAL=5
+      - WATCHTOWER_POLL_INTERVAL=120
       - WATCHTOWER_INCLUDE_STOPPED=true
       - WATCHTOWER_DISABLE_CONTAINERS=gluetun-dns gluetun zonos_container soulify postgres 3dcommerce_prod_db muddra_prod_db erpnext_backend erpnext_frontend erpnext_websocket erpnext_queue_short erpnext_queue_long erpnext_scheduler erpnext_configurator erpnext_create_site erpnext_mariadb erpnext_redis_cache erpnext_redis_queue erpnext_redis_socketio
       - WATCHTOWER_INCLUDE_RESTARTING=true
