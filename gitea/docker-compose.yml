@@ -1,0 +1,86 @@
+services:
+  server:
+    image: gitea/gitea:latest
+    container_name: gitea
+    ports:
+      # Optional: host port 3002 for direct access / fallback registry (e.g. if NAT hairpin fails)
+      - "127.0.0.1:3002:3000"
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__server__DOMAIN=${GITEA_DOMAIN:-gitea.hjacke.com}
+      - GITEA__server__ROOT_URL=https://${GITEA_DOMAIN:-gitea.hjacke.com}/
+      # Use HTTP internally; Traefik (reverse proxy) terminates HTTPS at gitea.hjacke.com
+      - GITEA__server__PROTOCOL=http
+      # SSH clone/push: Traefik listens on port 22 and forwards here
+      - GITEA__server__SSH_DOMAIN=${GITEA_DOMAIN:-gitea.hjacke.com}
+      - GITEA__server__SSH_PORT=22
+      - GITEA__database__DB_TYPE=postgres
+      - GITEA__database__HOST=db:5432
+      - GITEA__database__NAME=gitea
+      - GITEA__database__USER=gitea
+      - GITEA__database__PASSWD=${GITEA_DB_PASSWD:-gitea}
+    restart: always
+    volumes:
+      - /mnt/user/appdata/gitea/data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - db
+    networks:
+      - npm_services
+      - gitea_internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gitea-secure.entrypoints=websecure"
+      - "traefik.http.routers.gitea-secure.rule=Host(`${GITEA_DOMAIN:-gitea.hjacke.com}`)"
+      - "traefik.http.routers.gitea-secure.tls=true"
+      - "traefik.http.routers.gitea-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.gitea-secure.service=gitea"
+      - "traefik.http.services.gitea.loadbalancer.server.port=3000"
+      - "traefik.docker.network=npm_services"
+      # TCP router: port 22 (SSH) -> Gitea SSH
+      - "traefik.tcp.routers.gitea-ssh.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.gitea-ssh.entrypoints=ssh"
+      - "traefik.tcp.routers.gitea-ssh.service=gitea-ssh"
+      - "traefik.tcp.services.gitea-ssh.loadbalancer.server.port=22"
+    security_opt:
+      - no-new-privileges:true
+
+  db:
+    image: postgres:14
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-gitea}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gitea}
+      - POSTGRES_DB=${POSTGRES_DB:-gitea}
+    volumes:
+      - /mnt/user/appdata/gitea/postgres:/var/lib/postgresql/data
+    networks:
+      - gitea_internal
+
+  runner:
+    image: gitea/act_runner:latest
+    container_name: gitea-runner
+    restart: always
+    depends_on:
+      - server
+    volumes:
+      - /mnt/user/appdata/gitea/act_runner:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Config so job containers use npm_services network and can resolve "server"
+      - ./runner-config.yaml:/config.yaml:ro
+    environment:
+      - CONFIG_FILE=/config.yaml
+      - GITEA_INSTANCE_URL=http://server:3000
+      - GITEA_RUNNER_REGISTRATION_TOKEN=${GITEA_RUNNER_REGISTRATION_TOKEN}
+    networks:
+      - npm_services   # job containers use this to resolve "server"
+      - gitea_internal # runner ↔ Gitea (server) talk over this
+
+networks:
+  npm_services:
+    external: true
+  gitea_internal:
+    driver: bridge
+    internal: false   # allow outbound (e.g. job containers pulling images)

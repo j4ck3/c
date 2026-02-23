@@ -1,0 +1,46 @@
+# Netbird VPN mesh stack (combined netbird-server + dashboard)
+# Routing for netbird.hjacke.com is defined in traefik/dynamic/netbird.yml (file provider).
+# UDP 3478 must be reachable on the host for STUN (NAT traversal).
+
+services:
+  netbird-dashboard:
+    image: netbirdio/dashboard:latest
+    container_name: netbird-dashboard
+    restart: unless-stopped
+    env_file:
+      - ./dashboard.env
+    networks:
+      - npm_services
+    ports:
+      - "8080:80"
+    logging:
+      driver: json-file
+      options:
+        max-size: "500m"
+        max-file: "2"
+
+  netbird-server:
+    image: netbirdio/netbird-server:latest
+    container_name: netbird-server
+    restart: unless-stopped
+    networks:
+      - npm_services
+    ports:
+      - "3478:3478/udp"
+    volumes:
+      - netbird_data:/var/lib/netbird
+      - ./config.yaml:/etc/netbird/config.yaml:ro
+    command: ["--config", "/etc/netbird/config.yaml"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "500m"
+        max-file: "2"
+
+volumes:
+  netbird_data:
+    name: netbird_data
+
+networks:
+  npm_services:
+    external: true

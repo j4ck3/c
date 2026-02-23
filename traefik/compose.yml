@@ -10,6 +10,8 @@ services:
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      # Git over SSH (port 22) -> routed via TCP to Gitea
+      - "--entrypoints.ssh.address=:22"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--api.dashboard=true"
@@ -17,8 +19,8 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-    # No ports needed - macvlan gives Traefik its own IP (10.0.0.25)
-    # accessible directly on the network
+    # No ports needed - macvlan gives Traefik its own IP (10.0.0.25).
+    # Forward router: public IP 80/443 → 10.0.0.25:80 and 10.0.0.25:443 so gitea.hjacke.com works.
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /mnt/user/documents/compose/traefik/certs:/etc/traefik/certs:ro

@@ -1,0 +1,45 @@
+# ZeroClaw — headless Arch Linux image with OSINT tools
+# Subdomain: https://zeroclaw.hjacke.com (Traefik)
+# Copy .env.example to .env and set API_KEY, TELEGRAM_BOT_TOKEN, etc.
+
+services:
+  zeroclaw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: zeroclaw:local
+    container_name: zeroclaw
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - ZEROCLAW_ALLOW_PUBLIC_BIND=true
+      - ZEROCLAW_GATEWAY_PORT=42617
+      - HOME=/zeroclaw-data
+      # Optional: override from env file — API_KEY, PROVIDER, default_model, etc.
+    volumes:
+      - /mnt/user/appdata/zeroclaw:/zeroclaw-data
+      # Persistent directory for AI-downloaded pages/files (wget, curl, browser saves)
+      - /mnt/user/appdata/zeroclaw/downloads:/zeroclaw-data/downloads
+      # Optional: mount OpenClaw config for one-off migration (read-only)
+      # - /mnt/user/appdata/openclaw/config:/mnt/openclaw-state:ro
+    networks:
+      - npm_services
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.zeroclaw-secure.rule=Host(`zeroclaw.hjacke.com`)"
+      - "traefik.http.routers.zeroclaw-secure.entrypoints=websecure"
+      - "traefik.http.routers.zeroclaw-secure.tls=true"
+      # Uses default wildcard *.hjacke.com from traefik/dynamic/tls.yml
+      - "traefik.http.routers.zeroclaw-secure.service=zeroclaw"
+      - "traefik.http.services.zeroclaw.loadbalancer.server.port=42617"
+      - "traefik.docker.network=npm_services"
+    healthcheck:
+      test: ["CMD", "zeroclaw", "status"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  npm_services:
+    external: true

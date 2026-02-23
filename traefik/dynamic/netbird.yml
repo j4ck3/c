@@ -1,0 +1,51 @@
+# Netbird at netbird.hjacke.com — file provider so routing does not depend on Docker labels.
+# Backends must be on the same Docker network as Traefik (npm_services).
+# Ensure netbird-dashboard and netbird-server are running and on npm_services.
+
+http:
+  routers:
+    netbird-dashboard:
+      rule: "Host(`netbird.hjacke.com`)"
+      entryPoints:
+        - websecure
+      service: netbird-dashboard
+      priority: 1
+      tls:
+        certResolver: letsencrypt
+
+    netbird-backend:
+      rule: "Host(`netbird.hjacke.com`) && (PathPrefix(`/relay`) || PathPrefix(`/ws-proxy/`) || PathPrefix(`/api`) || PathPrefix(`/oauth2`))"
+      entryPoints:
+        - websecure
+      service: netbird-server
+      priority: 10
+      tls:
+        certResolver: letsencrypt
+
+    netbird-grpc:
+      rule: "Host(`netbird.hjacke.com`) && (PathPrefix(`/signalexchange.SignalExchange/`) || PathPrefix(`/management.ManagementService/`) || PathPrefix(`/management.ProxyService/`))"
+      entryPoints:
+        - websecure
+      service: netbird-server-h2c
+      priority: 10
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    netbird-dashboard:
+      loadBalancer:
+        servers:
+          - url: "http://netbird-dashboard:80"
+        passHostHeader: true
+
+    netbird-server:
+      loadBalancer:
+        servers:
+          - url: "http://netbird-server:80"
+        passHostHeader: true
+
+    netbird-server-h2c:
+      loadBalancer:
+        servers:
+          - url: "h2c://netbird-server:80"
+        passHostHeader: true

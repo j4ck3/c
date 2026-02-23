@@ -1,0 +1,15 @@
+# act_runner config: run job containers on the same network as Gitea
+# so the hostname "server" resolves inside the job (fixes checkout "Could not resolve host: server").
+log:
+  level: info
+runner:
+  file: .runner
+  capacity: 1
+  timeout: 3h
+  # Registry via reverse proxy: gitea.hjacke.com (DNS → public IP → router → Traefik → Gitea).
+  # Workflow secret REGISTRY should be gitea.hjacke.com; use HTTPS (no config-inline http).
+  envs:
+    GITEA_REGISTRY: gitea.hjacke.com
+container:
+  # Use Gitea's network so job containers can resolve "server" and reach Gitea at http://server:3000
+  network: npm_services

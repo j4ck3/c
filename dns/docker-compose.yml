@@ -2,33 +2,43 @@ services:
   pihole:
     container_name: pihole
     hostname: pihole
+    # Pin to a version for predictable upgrades; use :latest for rolling updates
     image: pihole/pihole:latest
     networks:
       br0_docker:
         ipv4_address: 10.0.0.53
+      dns_net:
+        ipv4_address: 172.44.0.2
       npm_services:
-    ports:
-      - 53:53/tcp
-      - 53:53/udp
-      - 80:80/tcp
+    # No host port publish: container has 10.0.0.53 on br0_docker, so LAN clients
+    # reach it directly at 10.0.0.53:53 and 10.0.0.53:80. Avoids libvirt dnsmasq conflict.
+    # Uncomment below only if you need to reach Pi-hole from the host itself:
+    # ports:
+    #   - 53:53/tcp
+    #   - 53:53/udp
+    #   - 80:80/tcp
     environment:
       - TZ=Europe/Stockholm
       - FTLCONF_webserver_port=80
+      # Required for Docker: listen on all interfaces so DNS works from all networks
+      - FTLCONF_dns_listeningMode=ALL
       - FTLCONF_dns_upstreams=9.9.9.9
-      #- FTLCONF_dns_upstreams=172.44.0.8#5053 # unbound
-      #- FTLCONF_dns_upstreams=9.9.9.9
-      #- FTLCONF_dns_upstreams=192.168.1.24#5153 # Cloudflared DoH proxy
+      # Optional: use local unbound (same compose) for recursive DNS
+      # - FTLCONF_dns_upstreams=172.44.0.8#5053
+      # - FTLCONF_dns_upstreams=192.168.1.24#5153  # e.g. Cloudflared DoH proxy
       - FTLCONF_webserver_api_password=${PIHOLE_API_KEY}
     volumes:
-      - /mnt/user/appdata/pihole/etc-pihole:/etc/pihole/:rw
-      - /mnt/user/appdata/pihole/etc-pihole:/var/log/pihole/:rw
+      # Persist config and databases (required). Do NOT mount /var/log/pihole to the same path.
+      - /mnt/user/appdata/pihole/etc-pihole:/etc/pihole:rw
+      # Optional: persist logs on host (use a different dir than etc-pihole)
+      - /mnt/user/appdata/pihole/var-log-pihole:/var/log/pihole:rw
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
-      - CAP_CHOWN
-      - CAP_SYS_TIME
       - CAP_NET_BIND_SERVICE
-      - CAP_SYS_NICE
+      - CAP_CHOWN
+      - SYS_TIME
+      - SYS_NICE
 
   unbound:
     container_name: unbound
