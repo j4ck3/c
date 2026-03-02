@@ -109,6 +109,7 @@ docker compose ps
 - Or create dashboard via Grafana UI using the queries above
 
 ### No backup logs in Loki
+- **Path alignment**: Backup-scheduler must write to `/mnt/user/backups/logs` (bind mount in backup compose). If you use a Docker volume for backup logs, Promtail won't see them.
 - Check Promtail is reading logs: `docker compose logs promtail | grep backup`
 - Verify log files exist: `ls -la /mnt/user/backups/logs/`
 - Check Loki is receiving data: `curl http://localhost:3100/loki/api/v1/labels`

@@ -27,7 +27,8 @@ services:
       - ./config:/config:ro
       - /root/.ssh:/root/.ssh:ro
       - restic-cache:/root/.cache/restic
-      - backup-logs:/var/log/backup
+      # Host path so Promtail can read logs for Grafana backup monitoring
+      - /mnt/user/backups/logs:/var/log/backup
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -126,6 +127,4 @@ services:
 volumes:
   restic-cache:
     name: restic-cache
-  backup-logs:
-    name: backup-logs
 

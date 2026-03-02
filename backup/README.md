@@ -108,8 +108,8 @@ docker compose exec backup-scheduler /scripts/sync-remotes.sh mainpc
 
 ## Logs
 
-- **Scheduled backup**: inside `backup-scheduler` at `/var/log/backup/` (volume `backup-logs`). To tail:  
-  `docker compose exec backup-scheduler tail -f /var/log/backup/cron.log`
+- **Scheduled backup**: logs at `/mnt/user/backups/logs/` (bind-mounted so Promtail/Grafana can ingest). To tail:  
+  `tail -f /mnt/user/backups/logs/cron.log` or `docker compose exec backup-scheduler tail -f /var/log/backup/cron.log`
 - **GoBackup**: check the Web UI or container logs.
 
 ## Restoring

@@ -1,0 +1,20 @@
+# Netdata at netdata.hjacke.com
+# Netdata runs with network_mode: host, so Traefik (with extra_hosts: host.docker.internal) proxies to the host.
+# Start: cd netdata && docker compose up -d
+
+http:
+  routers:
+    netdata:
+      rule: "Host(`netdata.hjacke.com`)"
+      entryPoints:
+        - websecure
+      service: netdata
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    netdata:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:19999"
+        passHostHeader: true

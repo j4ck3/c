@@ -1,0 +1,25 @@
+services:
+  hjackedotcom:
+    image: registry.gitlab.com/j4ck3-group/hjackedotcom
+    ports:
+      - "3022:3000"
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    networks:
+      - default
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.hjackedotcom.rule=Host(`hjacke.com`)"
+      - "traefik.http.routers.hjackedotcom.entrypoints=websecure"
+      - "traefik.http.routers.hjackedotcom.tls=true"
+      - "traefik.http.routers.hjackedotcom.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.hjackedotcom.service=hjackedotcom"
+      - "traefik.http.services.hjackedotcom.loadbalancer.server.port=3022"
+
+networks:
+  default: {}
+  traefik:
+    external: true

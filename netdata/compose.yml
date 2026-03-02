@@ -1,0 +1,40 @@
+# Netdata — real-time system and container monitoring
+# Dashboard: http://HOST:19999 or https://netdata.hjacke.com (when Traefik dynamic route is configured)
+# Based on: https://learn.netdata.cloud/docs/netdata-agent/installation/docker
+
+services:
+  netdata:
+    image: netdata/netdata:stable
+    container_name: netdata
+    pid: host
+    network_mode: host
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    environment:
+      - TZ=Europe/Stockholm
+    volumes:
+      - /mnt/user/appdata/netdata:/etc/netdata:rw
+      - netdata_lib:/var/lib/netdata
+      - netdata_cache:/var/cache/netdata
+      # Host mounts for full monitoring (see Learn Netdata Docker docs)
+      # ro only (rslave requires host / to be shared/slave - fails on Unraid)
+      - /:/host/root:ro
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/host/etc/localtime:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /run/dbus:/run/dbus:ro
+
+volumes:
+  netdata_lib:
+    name: netdata_lib
+  netdata_cache:
+    name: netdata_cache

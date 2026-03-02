@@ -38,6 +38,19 @@ services:
     ports:
       - "8096:8093"
 
+  gitlab-runner-4:
+    image: gitlab/gitlab-runner:alpine
+    container_name: gitlab-runner-4
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - gitlab-runner-4-config:/etc/gitlab-runner
+      - gitlab-runner-4-docker-machine:/root/.docker/machine
+    environment:
+      - TZ=Sweden/Stockholm
+    ports:
+      - "8097:8093"
+
 volumes:
   gitlab-runner-1-config:
   gitlab-runner-1-docker-machine:
@@ -45,3 +58,5 @@ volumes:
   gitlab-runner-2-docker-machine:
   gitlab-runner-3-config:
   gitlab-runner-3-docker-machine:
+  gitlab-runner-4-config:
+  gitlab-runner-4-docker-machine:
