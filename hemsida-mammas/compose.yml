@@ -1,8 +1,10 @@
 services:
   test-edlundfia-se:
     image: registry.gitlab.com/j4ck3-group/mammas-hemsida
-    ports:
-      - "3000:3000"
+    # No host port mapping – Traefik routes via Docker network (loadbalancer.server.port=3000).
+    # Avoids "port already allocated" when multiple stacks or CI deploys run on same host.
+    expose:
+      - "3000"
     env_file:
       - .env
     hostname: test.edlundfia.se
@@ -17,6 +19,7 @@ services:
       VITE_CONVEX_URL: ${VITE_CONVEX_URL}
       VITE_SITE_URL: ${VITE_SITE_URL}
       VITE_CONVEX_SITE_URL: ${VITE_CONVEX_SITE_URL}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS}
       # Cloudinary (product image uploads – /api/cloudinary/sign)
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_UPLOAD_PRESET_1: ${CLOUDINARY_UPLOAD_PRESET_1}
@@ -38,6 +41,7 @@ services:
       - "traefik.http.routers.mammas-hemsida.tls.certresolver=letsencrypt"
       - "traefik.http.routers.mammas-hemsida.service=mammas-hemsida"
       - "traefik.http.services.mammas-hemsida.loadbalancer.server.port=3000"
+      - "traefik.http.services.mammas-hemsida.loadbalancer.passHostHeader=true"
 
 networks:
   default: {}

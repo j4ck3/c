@@ -1,0 +1,16 @@
+services:
+  gitlab-runner-arm:
+    image: gitlab/gitlab-runner:alpine
+    container_name: gitlab-runner-arm
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config-arm:/etc/gitlab-runner
+      - gitlab-runner-arm-docker-machine:/root/.docker/machine
+    environment:
+      - TZ=Sweden/Stockholm
+    ports:
+      - "8097:8093"
+
+volumes:
+  gitlab-runner-arm-docker-machine:

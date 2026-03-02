@@ -1,4 +1,6 @@
 .env
+gitlab-runner/config-arm/config.toml
+gitlab-runner/config-arm/.runner_system_id
 *.log
 traefik/certs/
 openclaw/website_credentials.json
