@@ -37,9 +37,37 @@ services:
         max-size: "500m"
         max-file: "2"
 
+  # Netbird client (peer) – join this host to the mesh. Get NB_SETUP_KEY from dashboard.
+  netbird-client:
+    image: netbirdio/netbird:latest
+    container_name: netbird-client
+    hostname: netbird-client # peer name in dashboard; change if you like
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+    devices:
+      - /dev/net/tun
+    network_mode: host
+    environment:
+      - NB_SETUP_KEY=${NB_SETUP_KEY:?Set NB_SETUP_KEY in .env or environment}
+      - NB_MANAGEMENT_URL=https://netbird.hjacke.com/
+    volumes:
+      - netbird_client_data:/var/lib/netbird
+    depends_on:
+      - netbird-server
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "2"
+
 volumes:
   netbird_data:
     name: netbird_data
+  netbird_client_data:
+    name: netbird_client_data
 
 networks:
   npm_services:

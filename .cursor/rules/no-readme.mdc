@@ -1,0 +1,8 @@
+---
+description: Do not create additional README files when explaining solutions
+alwaysApply: true
+---
+
+# No Extra README Files
+
+Never create additional README.md (or readme.md) files when explaining a solution or something else. Prefer explaining in chat. Only create or modify a README when the user explicitly asks for it.
