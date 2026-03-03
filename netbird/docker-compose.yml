@@ -1,28 +1,34 @@
 # Netbird VPN mesh stack (combined netbird-server + dashboard)
-# Routing for netbird.hjacke.com is defined in traefik/dynamic/netbird.yml (file provider).
+# Based on: https://github.com/netbirdio/netbird (combined container, v0.65.0+)
+# Docs: https://docs.netbird.io/selfhosted/external-reverse-proxy#combined-container-setup-v0650
+# Routing for netbird.hjacke.com is in ../traefik/dynamic/netbird.yml (file provider).
 # UDP 3478 must be reachable on the host for STUN (NAT traversal).
+
+x-default: &default
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "500m"
+      max-file: "2"
 
 services:
   netbird-dashboard:
+    <<: *default
     image: netbirdio/dashboard:latest
     container_name: netbird-dashboard
-    restart: unless-stopped
     env_file:
       - ./dashboard.env
     networks:
       - npm_services
     ports:
       - "8080:80"
-    logging:
-      driver: json-file
-      options:
-        max-size: "500m"
-        max-file: "2"
+    # No Traefik labels: routing is defined in ../traefik/dynamic/netbird.yml (file provider).
 
   netbird-server:
+    <<: *default
     image: netbirdio/netbird-server:latest
     container_name: netbird-server
-    restart: unless-stopped
     networks:
       - npm_services
     ports:
@@ -31,11 +37,7 @@ services:
       - netbird_data:/var/lib/netbird
       - ./config.yaml:/etc/netbird/config.yaml:ro
     command: ["--config", "/etc/netbird/config.yaml"]
-    logging:
-      driver: json-file
-      options:
-        max-size: "500m"
-        max-file: "2"
+    # No Traefik labels: routing is defined in ../traefik/dynamic/netbird.yml (file provider).
 
   netbird-client:
     image: netbirdio/netbird:latest

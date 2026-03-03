@@ -18,16 +18,17 @@ http:
       entryPoints:
         - websecure
       service: netbird-server
-      priority: 10
+      priority: 100
       tls:
         certResolver: letsencrypt
 
+    # gRPC (signal + management; ProxyService for reverse-proxy feature if used)
     netbird-grpc:
       rule: "Host(`netbird.hjacke.com`) && (PathPrefix(`/signalexchange.SignalExchange/`) || PathPrefix(`/management.ManagementService/`) || PathPrefix(`/management.ProxyService/`))"
       entryPoints:
         - websecure
       service: netbird-server-h2c
-      priority: 10
+      priority: 100
       tls:
         certResolver: letsencrypt
 
