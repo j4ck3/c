@@ -1,16 +1,17 @@
 #!/bin/sh
-# Monitor Neko for inactivity and restart container after timeout
-# Integrated with Docker API
+# Reset job: runs soft reset after idle timeout
+# Clears browser data, clipboard, DNS cache - no container restart
 
 NEKO_URL="http://localhost:8080/api/sessions"
+NEKO_CLIPBOARD_URL="http://localhost:8080/api/room/clipboard"
 CONTAINER_NAME="neko-incognito"
 TIMEOUT_SECONDS=3600  # 1 hour
 CHECK_INTERVAL=60     # Check every minute
 
 last_activity=$(date +%s)
 
-echo "Starting inactivity monitor (timeout: ${TIMEOUT_SECONDS}s)"
-echo "Monitoring container: $CONTAINER_NAME"
+echo "Starting reset job (timeout: ${TIMEOUT_SECONDS}s)"
+echo "Container: $CONTAINER_NAME"
 echo "API endpoint: $NEKO_URL"
 
 # Wait for neko container to be ready
@@ -70,23 +71,23 @@ while true; do
         echo "$(date): No sessions, idle for ${idle_time}s"
         
         if [ $idle_time -ge $TIMEOUT_SECONDS ]; then
-            echo "$(date): Timeout reached (${idle_time}s >= ${TIMEOUT_SECONDS}s), restarting $CONTAINER_NAME"
+            echo "$(date): Timeout reached (${idle_time}s >= ${TIMEOUT_SECONDS}s), performing soft reset"
             
-            # Use docker restart with proper error handling
-            if docker restart "$CONTAINER_NAME" >/dev/null 2>&1; then
-                echo "$(date): Container $CONTAINER_NAME restarted successfully"
-                last_activity=$(date +%s)
-                
-                # Wait for container to be ready before resuming checks
-                echo "Waiting for container to be ready after restart..."
-                sleep 10
+            # Clear Neko room clipboard via API
+            if curl -s -X POST "$NEKO_CLIPBOARD_URL" -H "Content-Type: application/json" -d '{"text":""}' -o /dev/null -w "%{http_code}" 2>/dev/null | grep -q '204\|200'; then
+                echo "$(date): Cleared Neko clipboard"
             else
-                echo "$(date): ERROR: Failed to restart container $CONTAINER_NAME"
-                # Try to get more info
-                docker ps -a --filter "name=$CONTAINER_NAME" --format "{{.Status}}" 2>/dev/null || true
+                echo "$(date): Note: Could not clear Neko clipboard via API (may need auth)"
+            fi
+            
+            # Run soft reset inside container (clear X clipboard, DNS cache, browser data)
+            if docker exec "$CONTAINER_NAME" sh /opt/soft-reset.sh 2>&1; then
+                echo "$(date): Soft reset completed successfully"
+                last_activity=$(date +%s)
+                sleep 15
+            else
+                echo "$(date): ERROR: Soft reset failed"
             fi
         fi
     fi
 done
-
-
