@@ -1,19 +1,16 @@
 tls:
   stores:
     default:
+      # Default cert (fallback when no SNI match). Use existing cert; hjacke.com uses letsencrypt resolver.
       defaultCertificate:
-        certFile: /etc/traefik/certs/hjacke.com-fullchain.pem
-        keyFile: /etc/traefik/certs/hjacke.com-privkey.pem
+        certFile: /etc/traefik/certs/rjhdesign.pem
+        keyFile: /etc/traefik/certs/rjhdesign-key.pem
   certificates:
-    # Wildcard certificate for *.hjacke.com
-    - certFile: /etc/traefik/certs/hjacke.com-fullchain.pem
-      keyFile: /etc/traefik/certs/hjacke.com-privkey.pem
-    # Wildcard certificate for *.lokalhome.duckdns.org
-    - certFile: /etc/traefik/certs/lokalhome.duckdns.org-fullchain.pem
-      keyFile: /etc/traefik/certs/lokalhome.duckdns.org-privkey.pem
-    # Certificate for overseerr.lokalhome.duckdns.org
-    - certFile: /etc/traefik/certs/overseerr.lokalhome.duckdns.org-fullchain.pem
-      keyFile: /etc/traefik/certs/overseerr.lokalhome.duckdns.org-privkey.pem
+    # Certificates that exist in /etc/traefik/certs. hjacke.com uses certresolver=letsencrypt in router labels.
+    - certFile: /etc/traefik/certs/rjhdesign.pem
+      keyFile: /etc/traefik/certs/rjhdesign-key.pem
+    - certFile: /etc/traefik/certs/origin.pem
+      keyFile: /etc/traefik/certs/origin-key.pem
 
 
 
