@@ -11,6 +11,8 @@ http:
       rule: "Host(`code.hjacke.com`)"
       entryPoints:
         - websecure
+      tls:
+        certResolver: letsencrypt
       service: devbox
       middlewares:
         - devbox-auth

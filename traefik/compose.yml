@@ -3,6 +3,8 @@ services:
     image: traefik:v2.11
     container_name: traefik
     restart: unless-stopped
+    env_file:
+      - ./.env.local
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
@@ -18,7 +20,10 @@ services:
       - "--api.insecure=true"
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme.json"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      # Use DNS challenge so private A records like 10.0.0.25 can still get public certs.
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=60"
     # No ports needed - macvlan gives Traefik its own IP (10.0.0.25).
     # Forward on router so gitea.hjacke.com works:
     #   TCP 22  → 10.0.0.25:22  (Git SSH)

@@ -4,7 +4,9 @@ services:
     container_name: prometheus
     ports:
       - 9494:9090
-    command: --config.file=/etc/prometheus/prometheus.yaml
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --web.enable-lifecycle
     volumes:
       - /mnt/user/appdata/prometheus/config/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
       - /mnt/user/appdata/prometheus/data:/prometheus
@@ -42,11 +44,12 @@ services:
   node_exporter:
     image: quay.io/prometheus/node-exporter:v1.9.0
     container_name: node_exporter
+    hostname: tower
     command: --path.rootfs=/host
     pid: host
     restart: unless-stopped
     volumes:
-      - /:/host:ro,rslave
+      - /:/host:ro
     networks:
       - monitoring
       

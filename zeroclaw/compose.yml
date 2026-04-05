@@ -29,7 +29,7 @@ services:
       - "traefik.http.routers.zeroclaw-secure.rule=Host(`zeroclaw.hjacke.com`)"
       - "traefik.http.routers.zeroclaw-secure.entrypoints=websecure"
       - "traefik.http.routers.zeroclaw-secure.tls=true"
-      # Uses default wildcard *.hjacke.com from traefik/dynamic/tls.yml
+      - "traefik.http.routers.zeroclaw-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.zeroclaw-secure.service=zeroclaw"
       - "traefik.http.services.zeroclaw.loadbalancer.server.port=42617"
       - "traefik.docker.network=npm_services"

@@ -1,0 +1,20 @@
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install varlock binary (resolves secrets from Bitwarden SM at startup)
+RUN curl -fsSL https://github.com/dmno-dev/varlock/releases/download/varlock%400.4.2/varlock-linux-x64.tar.gz \
+    | tar -xz -C /usr/local/bin/ && chmod +x /usr/local/bin/varlock
+
+# Install OpenViking server
+RUN pip install --no-cache-dir openviking
+
+COPY openviking-start.py /scripts/start.py
+
+RUN mkdir -p /app/data /schema
+
+WORKDIR /schema
+
+EXPOSE 1933
+CMD ["varlock", "run", "--", "python3", "/scripts/start.py"]

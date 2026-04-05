@@ -23,7 +23,6 @@ services:
       - npm_services
     ports:
       - "8080:80"
-    # No Traefik labels: routing is defined in ../traefik/dynamic/netbird.yml (file provider).
 
   netbird-server:
     <<: *default
@@ -37,7 +36,6 @@ services:
       - netbird_data:/var/lib/netbird
       - ./config.yaml:/etc/netbird/config.yaml:ro
     command: ["--config", "/etc/netbird/config.yaml"]
-    # No Traefik labels: routing is defined in ../traefik/dynamic/netbird.yml (file provider).
 
   netbird-client:
     image: netbirdio/netbird:latest
