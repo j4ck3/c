@@ -1,35 +1,31 @@
-# Netdata on cachyos-jacke (gaming desktop). Netbird-only access — see README.md
-# https://cachyos-jacke.netbird.hjacke.com:19999
+# Netdata on cachyos-jacke. Netbird-only — http://cachyos-jacke.netbird.hjacke.com:19999
+# (bridge + port 19999; rootless Docker cannot use host network reliably)
 
 services:
   netdata:
     image: netdata/netdata:stable
     container_name: cachyos-jacke-netdata
     hostname: cachyos-jacke
-    pid: host
-    network_mode: host
     restart: unless-stopped
+    pid: host
     cap_add:
       - SYS_PTRACE
-      - SYS_ADMIN
     security_opt:
       - apparmor:unconfined
+    ports:
+      - "19999:19999"
     environment:
       TZ: Europe/Stockholm
     volumes:
       - netdataconfig:/etc/netdata
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata
-      - /:/host/root:ro,rslave
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
-      - /etc/localtime:/etc/localtime:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
-      - /var/log:/host/var/log:ro
       - /run/user/1000/docker.sock:/var/run/docker.sock:ro
-      - /run/dbus:/run/dbus:ro
 
 volumes:
   netdataconfig:
