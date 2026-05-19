@@ -1,36 +1,36 @@
-# cachyos-jacke
+# cachyos-jacke — Netdata (Netbird only)
 
-Live metrics for the **CachyOS workstation** (i9-14900KS, RX 7900 XTX Merc, rootless Docker) via [Glances](https://github.com/nicolargo/glances).
+Host monitoring for the gaming desktop (i9-14900KS, RX 7900 XTX). **Not** exposed on the public web.
 
-## Run on the desktop
+## Run
 
 ```bash
 cd cachyos-jacke
 docker compose up -d
 ```
 
-## Private URL (Netbird)
-
-After this machine is enrolled in Netbird with hostname `cachyos-jacke`:
-
-- **http://cachyos-jacke.netbird.hjacke.com:61208** (same pattern as `tower.netbird.hjacke.com`)
-
-Access is limited to your Netbird mesh (no Glances login — use Traefik basic auth if you expose `cachyos.hjacke.com`).
-
-Enroll (one-time):
+Optional — restrict port **19999** to the Netbird mesh (recommended):
 
 ```bash
-sudo netbird up \
-  --management-url https://netbird.hjacke.com/ \
-  --setup-key '<from Netbird dashboard or tower netbird .env>' \
-  --hostname cachyos-jacke
-netbird status   # confirm FQDN
+sudo bash install-netbird-firewall.sh
 ```
 
-## Optional HTTPS (Traefik on tower)
+## Private URL (Netbird)
 
-`traefik/dynamic/cachyos-jacke.yml` exposes **https://cachyos.hjacke.com** → this host’s Glances port (LAN or via Netbird IP). Add DNS `cachyos.hjacke.com` → Traefik (10.0.0.25) if you use it.
+Peer must be enrolled with DNS enabled (`netbird status` shows an FQDN):
 
-## Dockhand
+**http://cachyos-jacke.netbird.hjacke.com:19999**
 
-Point Dockhand at this host’s Docker API (`dotfiles/docker/README.md`) using the machine’s **Netbird IP** and port **2375** when TCP listener is enabled.
+Only devices on your Netbird mesh can resolve that name and reach the agent (plus apply the firewall script to block LAN).
+
+## Verify
+
+```bash
+docker compose ps
+curl -s http://127.0.0.1:19999/api/v1/info | head
+netbird status
+```
+
+## Remove Glances
+
+The old Glances stack in this folder was removed; use Netdata only.

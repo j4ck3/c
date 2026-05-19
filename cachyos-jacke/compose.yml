@@ -1,27 +1,37 @@
-# Gaming / dev desktop (cachyos-jacke) — system + AMD GPU metrics.
-# Runs on the workstation (not tower). Reach via Netbird:
-#   http://cachyos-jacke.netbird.hjacke.com:61208
-# Optional LAN/Traefik: https://cachyos.hjacke.com (see ../traefik/dynamic/cachyos-jacke.yml)
+# Netdata on cachyos-jacke (gaming desktop). Netbird-only access — see README.md
+# https://cachyos-jacke.netbird.hjacke.com:19999
 
 services:
-  glances:
-    image: nicolargo/glances:latest-full
-    container_name: cachyos-jacke-glances
+  netdata:
+    image: netdata/netdata:stable
+    container_name: cachyos-jacke-netdata
+    hostname: cachyos-jacke
+    pid: host
+    network_mode: host
     restart: unless-stopped
-    ports:
-      - "${GLANCES_PORT:-61208}:61208"
-    environment:
-      TZ: Europe/Stockholm
-      # Access control: Netbird mesh only (no public port forward). Optional LAN via Traefik basic auth.
-      GLANCES_OPT: "-w -B 0.0.0.0"
-    volumes:
-      # Rootless Docker on this host (jacke uid 1000)
-      - /run/user/1000/docker.sock:/var/run/docker.sock:ro
-      - /etc/os-release:/etc/os-release:ro
-    devices:
-      - /dev/dri:/dev/dri
-      - /dev/kfd:/dev/kfd
-    group_add:
-      - video
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
     security_opt:
       - apparmor:unconfined
+    environment:
+      TZ: Europe/Stockholm
+    volumes:
+      - netdataconfig:/etc/netdata
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /:/host/root:ro,rslave
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
+      - /run/user/1000/docker.sock:/var/run/docker.sock:ro
+      - /run/dbus:/run/dbus:ro
+
+volumes:
+  netdataconfig:
+  netdatalib:
+  netdatacache:
