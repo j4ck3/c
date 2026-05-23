@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "penpot": {
+      "type": "http",
+      "url": "https://penbot.hjacke.com/cursor-mcp/mcp"
+    }
+  }
+}

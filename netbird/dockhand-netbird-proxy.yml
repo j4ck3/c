@@ -1,0 +1,20 @@
+# TLS on tower NetBird IP -> Dockhand :3000.
+# Uses Let's Encrypt DNS-01 via Cloudflare, so Dockhand stays private to NetBird.
+services:
+  dockhand-netbird-proxy:
+    build:
+      context: ./dockhand-caddy
+    image: dockhand-caddy-cloudflare:local
+    container_name: dockhand-netbird-proxy
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - ../traefik/.env.local
+    volumes:
+      - ./dockhand-netbird.Caddyfile:/etc/caddy/Caddyfile:ro
+      - dockhand_caddy_data:/data
+      - dockhand_caddy_config:/config
+
+volumes:
+  dockhand_caddy_data:
+  dockhand_caddy_config:

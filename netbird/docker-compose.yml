@@ -37,6 +37,8 @@ services:
       - ./config.yaml:/etc/netbird/config.yaml:ro
     command: ["--config", "/etc/netbird/config.yaml"]
 
+  # Do not run `docker run netbirdio/netbird` for debugging — entrypoint blocks ~30s+.
+  # Use: docker exec netbird-client netbird status  (with timeout if needed)
   netbird-client:
     image: netbirdio/netbird:latest
     container_name: netbird-client

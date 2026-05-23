@@ -20,3 +20,13 @@ opencode-cache/
 opencode-data/
 
 komodo/app/
+
+codeberg-runner/secrets/
+codeberg-runner/.env
+
+guacamole/.env
+guacamole/data/
+guacamole/nginx/ssl/
+guacamole/init/initdb.sql
+guacamole/drive/
+guacamole/record/
