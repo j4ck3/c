@@ -1,0 +1,65 @@
+name: llama-open-webui
+
+services:
+  llama-cpp:
+    image: ghcr.io/ggml-org/llama.cpp:server-vulkan
+    restart: unless-stopped
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "983" # video
+      - "987" # render
+    volumes:
+      - ./models:/models
+    command:
+      - --model
+      - /models/RVN-Q4_K_M-multilingual-mtp.gguf
+      - --alias
+      - rvn-q4_k_m-mtp
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --ctx-size
+      - "65536"
+      - --parallel
+      - "1"
+      - --n-gpu-layers
+      - "999"
+      - --flash-attn
+      - "on"
+      - --jinja
+      - --spec-type
+      - draft-mtp
+      - --cache-type-k
+      - q8_0
+      - --cache-type-v
+      - q8_0
+      - --n-predict
+      - "16384"
+      - --reasoning-effort
+      - low
+      - --reasoning-preserve
+      - --api-key
+      - ${LLAMA_API_KEY}
+    ports:
+      - "10.0.0.165:8080:8080"
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:v0.11.0
+    restart: unless-stopped
+    depends_on:
+      - llama-cpp
+    environment:
+      ENABLE_OLLAMA_API: "false"
+      ENABLE_OPENAI_API: "true"
+      ENABLE_PERSISTENT_CONFIG: "false"
+      OPENAI_API_BASE_URL: http://llama-cpp:8080/v1
+      OPENAI_API_KEY: ${LLAMA_API_KEY}
+    volumes:
+      - open-webui-data:/app/backend/data
+    ports:
+      - "127.0.0.1:3001:8080"
+
+volumes:
+  open-webui-data:
