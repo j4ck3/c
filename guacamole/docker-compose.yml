@@ -104,7 +104,7 @@ services:
     image: guacamole/guacd:1.6.0
     networks:
       - guacnetwork_compose
-    restart: always
+    restart: "no"
     volumes:
     - /mnt/user/appdata/guacamole/drive:/drive:rw
     - /mnt/user/appdata/guacamole/record:/record:rw
@@ -121,7 +121,7 @@ services:
     image: postgres:15.2-alpine
     networks:
       - guacnetwork_compose
-    restart: always
+    restart: "no"
     volumes:
     - ./init:/docker-entrypoint-initdb.d:z
     - /mnt/user/appdata/guacamole/data:/var/lib/postgresql/data:Z
@@ -151,13 +151,13 @@ services:
     # Internal only; nginx publishes HTTPS on the host (see below).
     expose:
       - "8080"
-    restart: always
+    restart: "no"
 
 ########### optional ##############
   # nginx
   nginx:
    container_name: nginx_guacamole_compose
-   restart: always
+   restart: "no"
    image: nginx:latest
    volumes:
    - ./nginx/templates:/etc/nginx/templates:ro

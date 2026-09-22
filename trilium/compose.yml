@@ -21,7 +21,7 @@ configs:
 
 services:
   trilium:
-    image: zadam/trilium:latest
+    image: triliumnext/trilium:v0.105.0
     container_name: trilium
     restart: unless-stopped
     environment:
@@ -33,11 +33,18 @@ services:
       - trilium-internal
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=npm_services"
       - "traefik.http.routers.trilium.rule=Host(`trilium.hjacke.com`)"
       - "traefik.http.routers.trilium.entrypoints=websecure"
       - "traefik.http.routers.trilium.tls=true"
       - "traefik.http.routers.trilium.tls.certresolver=letsencrypt"
       - "traefik.http.routers.trilium.service=trilium"
+      - "traefik.http.routers.trilium-netbird.rule=Host(`trilium.netbird.hjacke.com`)"
+      - "traefik.http.routers.trilium-netbird.entrypoints=websecure"
+      - "traefik.http.routers.trilium-netbird.tls=true"
+      - "traefik.http.routers.trilium-netbird.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.trilium-netbird.middlewares=netbird-only@file"
+      - "traefik.http.routers.trilium-netbird.service=trilium"
       - "traefik.http.services.trilium.loadbalancer.server.port=8080"
       - "traefik.http.services.trilium.loadbalancer.server.scheme=http"
 

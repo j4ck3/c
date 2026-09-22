@@ -1,0 +1,112 @@
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: stremio-gluetun
+    hostname: stremio-gluetun
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    env_file:
+      - .env
+    environment:
+      - TZ=${TZ:-Europe/Stockholm}
+      - SERVER_COUNTRIES=${SERVER_COUNTRIES:-Sweden}
+      - UPDATER_PERIOD=24h
+      - DNS_UPSTREAM_RESOLVER_TYPE=DoT
+      - DNS_UPSTREAM_RESOLVERS=cloudflare
+      - DNS_CACHING=on
+      - FIREWALL_INPUT_PORTS=8090
+    expose:
+      - "8090"
+    volumes:
+      - /mnt/user/appdata/stremio/gluetun:/gluetun
+    networks:
+      - npm_services
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9999/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=npm_services"
+      - "traefik.http.routers.stremio.rule=Host(`m.hjacke.com`)"
+      - "traefik.http.routers.stremio.entrypoints=websecure"
+      - "traefik.http.routers.stremio.tls=true"
+      - "traefik.http.routers.stremio.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.stremio.service=stremio"
+      - "traefik.http.services.stremio.loadbalancer.server.port=8090"
+
+  stremio-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    image: local/stremio-server-go:v0.11.0-proxy
+    container_name: stremio-server
+    restart: unless-stopped
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    network_mode: service:gluetun
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "18"
+      - "107"
+    environment:
+      - TZ=${TZ:-Europe/Stockholm}
+      - HTTP_PORT=11470
+      - HTTPS_PORT=0
+      - APP_PATH=/data
+      - WEB_UI_LOCATION=https://m.hjacke.com/
+      - STREMIO_PUBLIC_URL=https://m.hjacke.com
+      # Homeserver has more RAM: 20 GiB piece cache under a 24 GiB soft ceiling.
+      - STREMIO_MEMORY_CACHE_SIZE=${STREMIO_MEMORY_CACHE_SIZE:-6442450944}
+      - STREMIO_MEM_LIMIT=${STREMIO_MEM_LIMIT:-10737418240}
+      - STREMIO_TORRENT_IDLE_TIMEOUT=1800
+      - STREMIO_PEERS_PER_TORRENT=200
+      - STREMIO_DISABLE_WEBTORRENT=0
+      # Prefer Intel/AMD VAAPI when /dev/dri exists; falls back to software.
+      - STREMIO_HWACCEL=${STREMIO_HWACCEL:-vaapi}
+      - STREMIO_HTTP_LOG=1
+      - STREMIO_LOG_LEVEL=info
+      - STREMIO_PROXY_PUBLIC_URL=https://m.hjacke.com
+    volumes:
+      - /mnt/user/appdata/stremio/data:/data
+
+  stremio-init:
+    image: curlimages/curl:latest
+    container_name: stremio-init
+    depends_on:
+      stremio-server:
+        condition: service_healthy
+    network_mode: service:gluetun
+    restart: "no"
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        curl --fail --silent --show-error \
+          --header "Content-Type: application/json" \
+          --request POST \
+          --data '{"cacheSize":6442450944,"btMaxConnections":200,"btHandshakeTimeout":25000,"btRequestTimeout":8000,"btDownloadSpeedSoftLimit":0,"btDownloadSpeedHardLimit":0,"btMinPeersForStable":10,"seedingEnabled":true}' \
+          http://127.0.0.1:11470/settings
+
+  stremio-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    image: local/stremio-web:v5.0.0-beta.39
+    container_name: stremio-web
+    restart: unless-stopped
+    depends_on:
+      stremio-server:
+        condition: service_healthy
+    network_mode: service:gluetun
+
+networks:
+  npm_services:
+    external: true

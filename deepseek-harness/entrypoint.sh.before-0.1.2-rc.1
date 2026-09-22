@@ -1,0 +1,281 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Compose runs this as root so we can publish Unraid's 0600 SSH config, then
+# drop to the same uid 1000 / gid 100 / docker group the image used before.
+if [ "$(id -u)" -eq 0 ]; then
+  # OpenViking runs in api_key mode. Its source ovcli.conf is root-only and
+  # also contains an admin-only root key, so derive a node-readable client
+  # config containing only the agent API key and the Docker-network endpoint.
+  if [ -f /mnt/openviking/ovcli.conf ]; then
+    install -d -o 1000 -g 100 -m 700 /home/t3/.openviking
+    node -e '
+      const fs = require("fs");
+      const source = JSON.parse(fs.readFileSync("/mnt/openviking/ovcli.conf", "utf8"));
+      if (!source.api_key) throw new Error("OpenViking ovcli.conf has no api_key");
+      const target = {
+        url: process.env.OPENVIKING_URL || "http://openviking:1933",
+        api_key: source.api_key,
+        timeout: source.timeout ?? 120,
+        output: source.output ?? "table",
+      };
+      fs.writeFileSync("/home/t3/.openviking/ovcli.conf", JSON.stringify(target, null, 2) + "\n", { mode: 0o600 });
+    '
+    chown 1000:100 /home/t3/.openviking/ovcli.conf
+    chmod 600 /home/t3/.openviking/ovcli.conf
+    echo "deepseek-harness: published OpenViking agent credentials"
+  fi
+  if [ -f /mnt/unraid-ssh/config ]; then
+    mkdir -p /etc/ssh/ssh_config.d
+    install -m 644 /mnt/unraid-ssh/config /etc/ssh/ssh_config.d/unraid.conf
+    echo "deepseek-harness: published Unraid SSH config to /etc/ssh/ssh_config.d/unraid.conf"
+  fi
+  # Image user is `node` with passwd home /home/node. OpenSSH reads
+  # ~/.ssh/config from the passwd home, not $HOME — so without this, Host
+  # aliases under /home/t3/.ssh/config are invisible to `ssh`.
+  if getent passwd node >/dev/null 2>&1; then
+    usermod -d /home/t3 node 2>/dev/null \
+      || sed -i 's|^node:x:1000:100::/home/node:|node:x:1000:100::/home/t3:|' /etc/passwd
+    echo "deepseek-harness: set node passwd home to /home/t3 for OpenSSH"
+  fi
+
+  # A macvlan child cannot reach its parent host through the macvlan NIC.
+  # Keep normal LAN traffic on br0_docker, but send Tower's host IP through
+  # npm_services' bridge gateway so host-published dev ports remain reachable.
+  if [ -n "${TOWER_HOST_IP:-}" ] || [ -n "${TOWER_HOST_ROUTE_VIA:-}" ]; then
+    : "${TOWER_HOST_IP:?TOWER_HOST_IP is required when configuring the Tower host route}"
+    : "${TOWER_HOST_ROUTE_VIA:?TOWER_HOST_ROUTE_VIA is required when configuring the Tower host route}"
+    ip route replace "${TOWER_HOST_IP}/32" via "${TOWER_HOST_ROUTE_VIA}"
+    tower_route="$(ip -4 route get "${TOWER_HOST_IP}")"
+    case "${tower_route}" in
+      *" via ${TOWER_HOST_ROUTE_VIA} "*) ;;
+      *)
+        echo "deepseek-harness: Tower host route verification failed: ${tower_route}" >&2
+        exit 1
+        ;;
+    esac
+    echo "deepseek-harness: routed ${TOWER_HOST_IP}/32 via bridge gateway ${TOWER_HOST_ROUTE_VIA}"
+  fi
+  exec setpriv --reuid=1000 --regid=100 --init-groups --inh-caps=-all -- "$0" "$@"
+fi
+
+DSH_PORT="${DSH_PORT:-13080}"
+PROXY_PORT="${PROXY_PORT:-3080}"
+TRUSTED_HOST="${TRUSTED_HOST:-code.netbird.hjacke.com}"
+DSH_HOME="${DSH_HOME:-$HOME/.dsh}"
+AGENTS_SKILLS="${HOME}/.agents/skills"
+VENDOR_DIR="${DSH_HOME}/vendor"
+PATCHES_DIR="${DSH_PATCHES_DIR:-/opt/dsh/patches}"
+BUNDLED_SKILLS="${DSH_BUNDLED_SKILLS:-/opt/dsh/skills}"
+REMOTE_VSCODE_INSTALLER="${DSH_REMOTE_VSCODE_INSTALLER:-/opt/dsh/scripts/install-remote-vscode-cli.sh}"
+REMOTE_VSCODE_HOSTS="${DSH_REMOTE_VSCODE_HOSTS:-tower}"
+
+mkdir -p "${DSH_HOME}" "${AGENTS_SKILLS}" "${VENDOR_DIR}"
+
+# dsh-remote-ssh needs the official VS Code CLI on each target. Unraid rebuilds
+# /root in RAM on every boot, so the installer also restores its link to the
+# persistent cache-pool copy before DSH accepts any requests.
+if [ -x "${REMOTE_VSCODE_INSTALLER}" ] && [ -n "${REMOTE_VSCODE_HOSTS}" ]; then
+  read -r -a remote_vscode_hosts <<< "${REMOTE_VSCODE_HOSTS}"
+  echo "deepseek-harness: ensuring VS Code Agent Host on ${remote_vscode_hosts[*]}"
+  if ! "${REMOTE_VSCODE_INSTALLER}" "${remote_vscode_hosts[@]}"; then
+    echo "deepseek-harness: warning: remote VS Code Agent Host setup failed; Remote SSH will retry after the next container restart" >&2
+  fi
+fi
+
+# Pin new sessions to full access. workspace-write fail-closes on this host
+# (Landlock disabled, bwrap: Operation not permitted) and then the model
+# loops on danger-full-access approval prompts. Existing sessions keep their
+# logged preset until a new chat is started.
+settings_yaml="${DSH_HOME}/settings.yaml"
+if [ ! -f "${settings_yaml}" ] || ! grep -q '^permission:' "${settings_yaml}"; then
+  printf '\npermission:\n  defaultPreset: danger-full-access\n' >> "${settings_yaml}"
+  echo "deepseek-harness: set permission.defaultPreset=danger-full-access"
+fi
+
+# Unlock Settings/credentials on the Netbird hostname. dsh pins those RPCs to
+# loopback unless this plugin remaps them onto --trusted-host.
+profile_pkg="${DSH_HOME}/profiles/web/package.json"
+if ! grep -q 'dsh-trusted-host-proxy-403-fix' "${profile_pkg}" 2>/dev/null; then
+  echo "deepseek-harness: installing dsh-trusted-host-proxy-403-fix@0.3.0"
+  dsh plugin --profile web add dsh-trusted-host-proxy-403-fix@0.3.0
+fi
+
+# Transparent SSH workspaces (Settings → Remote SSH). Needs OpenSSH already working.
+if ! grep -q '"dsh-remote-ssh"' "${profile_pkg}" 2>/dev/null; then
+  echo "deepseek-harness: installing dsh-remote-ssh"
+  dsh plugin --profile web add dsh-remote-ssh
+fi
+
+# In-process OpenViking memory: automatic per-step recall, durable capture,
+# an MCP tool bridge, and the openviking-memory skill. The profile lives on a
+# persistent volume, but this guard also restores it after profile resets.
+if ! grep -q '@openviking/dsh-memory-plugin' "${profile_pkg}" 2>/dev/null; then
+  echo "deepseek-harness: installing OpenViking memory bundle"
+  dsh plugin --profile web add @openviking/dsh-memory-plugin
+fi
+
+install_plugin_ahp_090() {
+  local remote_ssh_pkg="$1"
+  local nest="${remote_ssh_pkg}/node_modules/@microsoft/agent-host-protocol"
+  local ver
+  ver="$(ahp_ver "${nest}")"
+  if [ "${ver}" = "0.9.0" ]; then
+    return 0
+  fi
+  echo "deepseek-harness: installing plugin AHP client 0.9.0 via npm pack (was ${ver:-none})"
+  local tmp
+  tmp="$(mktemp -d)"
+  if ! npm pack @microsoft/agent-host-protocol@0.9.0 --pack-destination "${tmp}" >/dev/null 2>&1 \
+    || ! tar -xzf "${tmp}/microsoft-agent-host-protocol-0.9.0.tgz" -C "${tmp}"; then
+    rm -rf "${tmp}"
+    echo "deepseek-harness: warning: failed to install plugin AHP client 0.9.0" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "${nest}")"
+  rm -rf "${nest}"
+  mv "${tmp}/package" "${nest}"
+  rm -rf "${tmp}"
+}
+
+# Stable VS Code Agent Host requires AHP ^0.9.0. dsh-remote-ssh@0.2.4 still
+# resolves @microsoft/agent-host-protocol@0.7 which cannot negotiate. Never
+# `pnpm add` at the profile root — that rewires the web profile and returns HTTP 400.
+profile_web="${DSH_HOME}/profiles/web"
+remote_ssh_pkg="${profile_web}/node_modules/dsh-remote-ssh"
+ahp_ver() {
+  local pkg="$1/package.json"
+  [ -f "$pkg" ] && node -p "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).version" "$pkg" 2>/dev/null || true
+}
+if [ -d "${remote_ssh_pkg}" ]; then
+  install_plugin_ahp_090 "${remote_ssh_pkg}" || true
+fi
+
+# 0.2.4 targets DSH rc.6. rc.2 keyed slots + Origin/Host port mismatch make
+# folder/file pickers return { error: "forbidden" }. Patch every boot so a
+# plugin reinstall cannot bring the breakage back. Also offers AHP 0.9.0.
+REMOTE_SSH_PATCH="${DSH_REMOTE_SSH_PATCH:-/opt/dsh/patches/patch-dsh-remote-ssh.mjs}"
+if [ -f "${REMOTE_SSH_PATCH}" ]; then
+  node "${REMOTE_SSH_PATCH}"
+fi
+
+# dsh-better-sidebar launches `git` with node:child_process, so Remote SSH
+# workspace aliases are accidentally evaluated inside this container. Route
+# Git through DSH's cwd-aware subprocess service instead. Reapply every boot
+# because `dsh plugin add/update` can replace the installed bundle.
+BETTER_SIDEBAR_PATCH="${DSH_BETTER_SIDEBAR_PATCH:-/opt/dsh/patches/patch-dsh-better-sidebar.mjs}"
+if [ -f "${BETTER_SIDEBAR_PATCH}" ]; then
+  node "${BETTER_SIDEBAR_PATCH}"
+fi
+
+# Sparse clone: only the skills/ tree. Repos are large (especially caveman).
+sync_repo() {
+  local url="$1" dest="$2"
+  if [ -d "${dest}/.git" ]; then
+    echo "deepseek-harness: updating $(basename "${dest}")"
+    git -C "${dest}" fetch --depth 1 origin 2>/dev/null || return 0
+    git -C "${dest}" reset --hard FETCH_HEAD 2>/dev/null || true
+  else
+    echo "deepseek-harness: cloning ${url} (skills/ only)"
+    git clone --depth 1 --filter=blob:none --sparse "${url}" "${dest}"
+    git -C "${dest}" sparse-checkout set skills
+  fi
+}
+
+# Link each <dir>/SKILL.md into ~/.agents/skills/<dir-name> so dsh discovers it.
+# Skip caveman's plugins/ mirror (same skills as skills/).
+link_skill_tree() {
+  local root="$1"
+  [ -d "${root}" ] || return 0
+  find "${root}" -name SKILL.md -type f | while read -r skill; do
+    local dir name
+    dir="$(dirname "${skill}")"
+    case "${dir}" in
+      */plugins/*) continue ;;
+    esac
+    name="$(basename "${dir}")"
+    ln -sfn "${dir}" "${AGENTS_SKILLS}/${name}"
+  done
+}
+
+sync_repo https://github.com/mattpocock/skills.git "${VENDOR_DIR}/mattpocock-skills"
+sync_repo https://github.com/JuliusBrussee/caveman.git "${VENDOR_DIR}/caveman"
+
+link_skill_tree "${VENDOR_DIR}/mattpocock-skills/skills"
+link_skill_tree "${VENDOR_DIR}/caveman/skills"
+
+if [ -d "${BUNDLED_SKILLS}" ]; then
+  find "${BUNDLED_SKILLS}" -mindepth 1 -maxdepth 1 -type d | while read -r dir; do
+    ln -sfn "${dir}" "${AGENTS_SKILLS}/$(basename "${dir}")"
+  done
+fi
+
+echo "deepseek-harness: skills in ${AGENTS_SKILLS}"
+ls -1 "${AGENTS_SKILLS}" | sed 's/^/  /' || true
+
+PATCH_ARGS=()
+if [ -f "${PATCHES_DIR}/reliability.cordis.yml" ]; then
+  PATCH_ARGS+=(--patch "${PATCHES_DIR}/reliability.cordis.yml")
+  echo "deepseek-harness: agent reliability overlay ${PATCHES_DIR}/reliability.cordis.yml"
+fi
+if [ -f "${PATCHES_DIR}/context7.cordis.yml" ]; then
+  PATCH_ARGS+=(--patch "${PATCHES_DIR}/context7.cordis.yml")
+  echo "deepseek-harness: Context7 MCP overlay ${PATCHES_DIR}/context7.cordis.yml"
+  if [ -z "${CONTEXT7_API_KEY:-}" ]; then
+    echo "deepseek-harness: CONTEXT7_API_KEY unset (works, higher limits with a key from https://context7.com/dashboard)"
+  fi
+fi
+if [ -f "${PATCHES_DIR}/chrome-devtools.cordis.yml" ]; then
+  PATCH_ARGS+=(--patch "${PATCHES_DIR}/chrome-devtools.cordis.yml")
+  echo "deepseek-harness: Chrome DevTools MCP overlay ${PATCHES_DIR}/chrome-devtools.cordis.yml"
+fi
+if [ -f "${PATCHES_DIR}/openviking.cordis.yml" ]; then
+  PATCH_ARGS+=(--patch "${PATCHES_DIR}/openviking.cordis.yml")
+  echo "deepseek-harness: OpenViking memory overlay ${PATCHES_DIR}/openviking.cordis.yml"
+fi
+
+echo "deepseek-harness: starting dsh on 127.0.0.1:${DSH_PORT}"
+echo "deepseek-harness: trusted host ${TRUSTED_HOST}"
+echo "deepseek-harness: proxying 0.0.0.0:${PROXY_PORT} -> 127.0.0.1:${DSH_PORT}"
+
+# --patch is a launcher flag used with --profile, not with the `web` alias.
+# dsh refuses --host 0.0.0.0; keep loopback and front with socat for the reverse proxy.
+dsh \
+  --profile web \
+  "${PATCH_ARGS[@]}" \
+  --no-open \
+  --host 127.0.0.1 \
+  --port "${DSH_PORT}" \
+  --trusted-host "${TRUSTED_HOST}" \
+  --trusted-host "127.0.0.1:${DSH_PORT}" \
+  &
+dsh_pid=$!
+
+cleanup() {
+  kill "${dsh_pid}" 2>/dev/null || true
+  kill "${proxy_pid:-}" 2>/dev/null || true
+  wait "${dsh_pid}" 2>/dev/null || true
+  wait "${proxy_pid:-}" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+# Wait until loopback accepts connections before advertising the proxy port.
+for _ in $(seq 1 60); do
+  if curl -fsS --max-time 1 "http://127.0.0.1:${DSH_PORT}/" >/dev/null 2>&1; then
+    break
+  fi
+  if ! kill -0 "${dsh_pid}" 2>/dev/null; then
+    echo "deepseek-harness: dsh exited before becoming ready" >&2
+    wait "${dsh_pid}" || true
+    exit 1
+  fi
+  sleep 1
+done
+
+# Keep the launcher as PID 1's child. If either the web server or its proxy
+# exits, exit too so Docker's restart policy restores a working pair rather
+# than reporting a live proxy that can only return connection refusals.
+socat "TCP-LISTEN:${PROXY_PORT},fork,reuseaddr,bind=0.0.0.0" "TCP:127.0.0.1:${DSH_PORT}" &
+proxy_pid=$!
+wait -n "${dsh_pid}" "${proxy_pid}"
+exit 1

@@ -1,0 +1,58 @@
+diff --git a/internal/api/api.go b/internal/api/api.go
+index 970641f..65bfeb4 100644
+--- a/internal/api/api.go
++++ b/internal/api/api.go
+@@ -1369,6 +1369,9 @@ func computeInterfaces() []string {
+ }
+ 
+ func (s *server) baseURL() string {
++	if publicURL := strings.TrimRight(os.Getenv("STREMIO_PUBLIC_URL"), "/"); publicURL != "" {
++		return publicURL
++	}
+ 	for _, a := range availableInterfaces() {
+ 		if net.ParseIP(a) != nil && strings.Count(a, ":") == 0 { // first IPv4
+ 			return fmt.Sprintf("http://%s:%d", a, s.cfg.HTTPPort)
+diff --git a/internal/media/hls.go b/internal/media/hls.go
+index 357d271..284b1cf 100644
+--- a/internal/media/hls.go
++++ b/internal/media/hls.go
+@@ -290,10 +290,23 @@ func newHLS() *hlsManager {
+ 	return m
+ }
+ 
+-// localize rewrites the self-signed https loopback URL to plain http so ffmpeg
+-// (which doesn't ignore TLS errors) can read the stream.
++// localize rewrites media URLs so ffprobe/ffmpeg can read them from inside the
++// server process. Public HTTPS hostnames often fail under VPN DNS / hairpin
++// NAT; map STREMIO_PUBLIC_URL back to the local HTTP listener instead.
+ func localize(u string) string {
+-	return strings.ReplaceAll(u, "https://127.0.0.1:12470", "http://127.0.0.1:11470")
++	u = strings.ReplaceAll(u, "https://127.0.0.1:12470", "http://127.0.0.1:11470")
++	publicURL := strings.TrimRight(os.Getenv("STREMIO_PUBLIC_URL"), "/")
++	if publicURL == "" {
++		publicURL = strings.TrimRight(os.Getenv("STREMIO_PROXY_PUBLIC_URL"), "/")
++	}
++	if publicURL != "" && (u == publicURL || strings.HasPrefix(u, publicURL+"/")) {
++		local := "http://127.0.0.1:11470"
++		if port := strings.TrimSpace(os.Getenv("HTTP_PORT")); port != "" {
++			local = "http://127.0.0.1:" + port
++		}
++		u = local + strings.TrimPrefix(u, publicURL)
++	}
++	return u
+ }
+ 
+ // sanitizeM3U8Attr removes characters that are illegal inside a quoted-string
+diff --git a/internal/media/media.go b/internal/media/media.go
+index e95b88d..fbc0dec 100644
+--- a/internal/media/media.go
++++ b/internal/media/media.go
+@@ -80,6 +80,8 @@ func (p *prober) Probe(streamURL string) (interface{}, error) {
+ 	if !strings.Contains(streamURL, "://") {
+ 		streamURL = p.baseURLLocal + "/" + strings.TrimLeft(streamURL, "/")
+ 	}
++	// Same hairpin rewrite as Tracks/HLS so public HTTPS URLs work behind VPN.
++	streamURL = localize(streamURL)
+ 
+ 	// Serve from cache — avoids repeated ffprobe spawns for the same URL.
+ 	p.probeMu.Lock()

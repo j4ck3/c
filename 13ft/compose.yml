@@ -7,6 +7,7 @@ services:
     networks:
       - npm_services
     labels:
+      - "com.centurylinklabs.watchtower.enable=true"
       - "traefik.enable=true"
       - "traefik.docker.network=npm_services"
       - "traefik.http.routers.13ft.rule=Host(`13ft.hjacke.com`)"

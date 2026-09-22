@@ -12,6 +12,9 @@ services:
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      # Traefik 2.11.2+ defaults readTimeout=60s, which kills NetBird gRPC streams.
+      - "--entryPoints.websecure.transport.respondingTimeouts.readTimeout=24h"
+      - "--entryPoints.websecure.transport.respondingTimeouts.idleTimeout=24h"
       # Git over SSH (port 22) -> routed via TCP to Gitea
       - "--entrypoints.ssh.address=:22"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
@@ -41,7 +44,8 @@ services:
     networks:
       br0_docker:
         ipv4_address: 10.0.0.25
-      npm_services: {}
+      npm_services:
+        ipv4_address: 172.25.0.254
 
 networks:
   br0_docker:

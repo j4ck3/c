@@ -3,17 +3,21 @@ services:
     image: fnsys/dockhand:latest
     container_name: dockhand
     restart: unless-stopped
-    # Reachable on the tower NetBird IP (remote peers). Do not use 0.0.0.0:3000.
-    ports:
-      - "127.0.0.1:3000:3000"
-      - "100.113.194.104:3000:3000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /mnt/user/appdata/dockhand/data:/app/data
     networks:
       - npm_services
     labels:
-      - "traefik.enable=false"
+      - "traefik.enable=true"
+      - "traefik.docker.network=npm_services"
+      - "traefik.http.routers.dockhand.rule=Host(`dockhand.netbird.hjacke.com`)"
+      - "traefik.http.routers.dockhand.entrypoints=websecure"
+      - "traefik.http.routers.dockhand.tls=true"
+      - "traefik.http.routers.dockhand.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dockhand.middlewares=netbird-only@file"
+      - "traefik.http.routers.dockhand.service=dockhand"
+      - "traefik.http.services.dockhand.loadbalancer.server.port=3000"
       - "dockhand.url=https://dockhand.netbird.hjacke.com"
       - "net.unraid.docker.icon=https://avatars.githubusercontent.com/u/80454229?s=48&v=4"
     environment:

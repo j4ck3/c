@@ -1,0 +1,45 @@
+FROM golang:1.26-alpine AS build
+
+RUN apk add --no-cache ca-certificates git
+
+ARG STREMIO_SERVER_COMMIT=c6549696ab7fc05419eb8734cc2bd98f9bc3a5fd
+RUN git clone https://github.com/M0Rf30/stremio-server-go.git /src \
+    && git -C /src checkout "${STREMIO_SERVER_COMMIT}"
+
+WORKDIR /src
+COPY stremio-server-public-url.patch /tmp/stremio-server-public-url.patch
+RUN git apply /tmp/stremio-server-public-url.patch \
+    && go mod download \
+    && CGO_ENABLED=0 go build \
+        -trimpath \
+        -ldflags "-s -w -checklinkname=0 -X main.buildVersion=v0.11.0-proxy -X main.buildCommit=${STREMIO_SERVER_COMMIT}" \
+        -o /out/stremio-server \
+        ./cmd/stremio-server
+
+FROM alpine:3.24
+
+RUN apk add --no-cache ffmpeg yt-dlp ca-certificates tzdata \
+    && adduser -D -u 1000 user
+
+COPY --from=build /out/stremio-server /usr/local/bin/stremio-server
+
+ENV HTTP_PORT=11470 \
+    HTTPS_PORT=0 \
+    BT_LISTEN_PORT=0 \
+    APP_PATH=/data \
+    WEB_UI_LOCATION=https://web.stremio.com/ \
+    HOME=/home/user
+
+RUN mkdir -p /data \
+    && chown -R user:user /data /home/user
+
+USER user
+WORKDIR /home/user
+
+VOLUME ["/data"]
+EXPOSE 11470
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD wget -q -O - "http://127.0.0.1:${HTTP_PORT}/heartbeat" >/dev/null 2>&1 || exit 1
+
+ENTRYPOINT ["/usr/local/bin/stremio-server"]

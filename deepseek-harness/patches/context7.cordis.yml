@@ -1,0 +1,15 @@
+# Context7 MCP — https://context7.com/
+# Remote streamable-http; optional CONTEXT7_API_KEY raises rate limits.
+- insert:
+    - id: mcp-context7
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: context7
+        transport: streamable-http
+        url: https://mcp.context7.com/mcp
+        headers: !!js >-
+          process.env.CONTEXT7_API_KEY
+            ? { Authorization: 'Bearer ' + process.env.CONTEXT7_API_KEY }
+            : {}
+        failOnStartupError: false
+        toolCallTimeoutMs: 60000

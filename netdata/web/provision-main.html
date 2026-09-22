@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Provision Netdata dashboard: main</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 3rem auto; padding: 0 1rem; }
+    .ok { color: #0a0; }
+    .err { color: #a00; }
+    code { background: #f4f4f4; padding: 0.1em 0.35em; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Netdata: provision <code>main</code> dashboard</h1>
+  <p id="status">Loading dashboard definition…</p>
+  <p id="hint" hidden>
+    Open the dashboard:
+    <a id="dash-link" href="/#/dashboards/local-custom-dashboard">main</a>
+    (hard refresh with Ctrl+F5 if cards look unchanged)
+  </p>
+  <script type="module">
+    const DB_NAME = "netdata";
+    const STORE_NAME = "netdata-cache";
+    const KEY = "local-custom-dashboard";
+
+    async function openDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onerror = () => reject(req.error);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+      });
+    }
+
+    async function idbDelete(db, key) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const req = tx.objectStore(STORE_NAME).delete(key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function idbSet(db, key, value) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).put(value, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function run() {
+      const status = document.getElementById("status");
+      const hint = document.getElementById("hint");
+      try {
+        const res = await fetch(
+          `/custom/main-dashboard.json?v=${Date.now()}`,
+          { cache: "no-store" }
+        );
+        if (!res.ok) throw new Error(`Could not load main-dashboard.json (${res.status})`);
+        const payload = await res.json();
+        const dashboard = payload.dashboard;
+        if (!dashboard?.snapshot?.uiState) throw new Error("Invalid dashboard JSON");
+
+        const revision = dashboard.revision ?? "?";
+        const db = await openDb();
+        await idbDelete(db, KEY);
+        await idbSet(db, KEY, { value: dashboard, timestamp: Date.now() });
+        db.close();
+
+        status.innerHTML =
+          `<span class="ok">Dashboard <strong>main</strong> revision <code>${revision}</code> saved. Redirecting…</span>`;
+        hint.hidden = false;
+        setTimeout(() => {
+          window.location.replace("/#/dashboards/local-custom-dashboard");
+        }, 800);
+      } catch (err) {
+        status.innerHTML = `<span class="err">Failed: ${err.message}</span>`;
+        console.error(err);
+      }
+    }
+
+    run();
+  </script>
+</body>
+</html>

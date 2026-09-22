@@ -1,0 +1,18 @@
+# Tune the official OpenViking DSH bundle for focused, inexpensive recall.
+# Credentials come from ~/.openviking/ovcli.conf, generated at boot.
+- id: openviking-memory
+  config:
+    - id: openviking-memory-runtime
+      name: '@openviking/dsh-memory-plugin'
+      config:
+        endpoint: http://openviking:1933
+        # Enough room for actionable history without crowding the model context.
+        recallTokenBudget: 1600
+        scoreThreshold: 0.35
+        # Tool outputs are often bulky and already available in the transcript.
+        captureToolResults: false
+        # Child agents inherit context but do not duplicate long-term captures.
+        skipSubagentSessions: true
+        # Commit regularly while avoiding a request for every short exchange.
+        commitTokenThreshold: 12000
+        mcpToolCallTimeoutMs: 60000

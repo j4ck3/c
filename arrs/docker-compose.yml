@@ -11,16 +11,17 @@ services:
       - /mnt/user/appdata/sonarr/config:/config
       - /mnt/user/media/TV:/tv
       - /mnt/user/downloads/qbitorrent:/downloads
-    ports:
-      - 8989:8989
     networks:
       - npm_services
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.sonarr.rule=Host(`sonarr.hjacke.com`)"
+      - "traefik.docker.network=npm_services"
+      - "traefik.http.routers.sonarr.rule=Host(`sonarr.netbird.hjacke.com`)"
       - "traefik.http.routers.sonarr.entrypoints=websecure"
       - "traefik.http.routers.sonarr.tls=true"
       - "traefik.http.routers.sonarr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sonarr.middlewares=netbird-only@file"
+      - "traefik.http.routers.sonarr.service=sonarr"
       - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
     restart: unless-stopped
 
@@ -36,16 +37,17 @@ services:
       - /mnt/user/appdata/binhex-radarr:/config
       - /mnt/user/media/Movies:/movies
       - /mnt/user/downloads/qbitorrent:/downloads
-    ports:
-      - 7878:7878
     networks:
       - npm_services
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.radarr.rule=Host(`radarr.hjacke.com`)"
+      - "traefik.docker.network=npm_services"
+      - "traefik.http.routers.radarr.rule=Host(`radarr.netbird.hjacke.com`)"
       - "traefik.http.routers.radarr.entrypoints=websecure"
       - "traefik.http.routers.radarr.tls=true"
       - "traefik.http.routers.radarr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.radarr.middlewares=netbird-only@file"
+      - "traefik.http.routers.radarr.service=radarr"
       - "traefik.http.services.radarr.loadbalancer.server.port=7878"
     restart: unless-stopped
 
@@ -60,16 +62,17 @@ services:
     volumes:
       - /mnt/user/appdata/bazarr/config:/config
       - /mnt/user/media:/media
-    ports:
-      - 6767:6767
     networks:
       - npm_services
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.bazarr.rule=Host(`bazarr.hjacke.com`)"
+      - "traefik.docker.network=npm_services"
+      - "traefik.http.routers.bazarr.rule=Host(`bazarr.netbird.hjacke.com`)"
       - "traefik.http.routers.bazarr.entrypoints=websecure"
       - "traefik.http.routers.bazarr.tls=true"
       - "traefik.http.routers.bazarr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.bazarr.middlewares=netbird-only@file"
+      - "traefik.http.routers.bazarr.service=bazarr"
       - "traefik.http.services.bazarr.loadbalancer.server.port=6767"
     restart: unless-stopped
 

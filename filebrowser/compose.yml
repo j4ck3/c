@@ -1,29 +1,30 @@
+# FileBrowser Quantum (gtsteffaniak/filebrowser) — stable v1.5.x line.
+# Mesh-only via NetBird: https://files.netbird.hjacke.com
+# Routing lives in ../netbird/dockhand-netbird.Caddyfile (dockhand-netbird-proxy).
+# Deliberately no host ports and no Traefik labels: the container is only
+# reachable from the NetBird tailnet through the Caddy proxy on npm_services.
+# Old filebrowser/filebrowser:s6 database and settings were not migrated
+# (incompatible formats); originals kept at:
+#   /mnt/cache/appdata/filebrowser/filebrowser.db
+#   /mnt/user/appdata/filebrowser/settings.json
 services:
   filebrowser:
-    image: filebrowser/filebrowser:s6
+    image: gtstef/filebrowser:stable
     container_name: filebrowser
     hostname: filebrowser
     restart: unless-stopped
-    ports:
-      - 7171:80
+    # Same UID/GID the old linuxserver-style container used (PUID 1000 / PGID 100).
+    user: "1000:100"
+    env_file:
+      - .env
     environment:
-      - PUID=1000
-      - PGID=100
       - TZ=Europe/Stockholm
     volumes:
       - /mnt/cache:/srv
-      - /mnt/cache/appdata/filebrowser/filebrowser.db:/database/filebrowser.db
-      - /mnt/user/appdata/filebrowser/settings.json:/config/settings.json
+      # Config + database.db + cacheDir all persist here (docker default path).
+      - ./data:/home/filebrowser/data
     networks:
-      - default
       - npm_services
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.filebrowser.rule=Host(`files.hjacke.com`)"
-      - "traefik.http.routers.filebrowser.entrypoints=websecure"
-      - "traefik.http.routers.filebrowser.tls=true"
-      - "traefik.http.routers.filebrowser.tls.certresolver=letsencrypt"
-      - "traefik.http.services.filebrowser.loadbalancer.server.port=80"
 
 networks:
   npm_services:

@@ -32,6 +32,13 @@ http:
       tls:
         certResolver: letsencrypt
 
+  serversTransports:
+    netbird-longlived:
+      forwardingTimeouts:
+        dialTimeout: 30s
+        idleConnTimeout: 24h
+        responseHeaderTimeout: 0s
+
   services:
     netbird-dashboard:
       loadBalancer:
@@ -41,12 +48,14 @@ http:
 
     netbird-server:
       loadBalancer:
+        serversTransport: netbird-longlived
         servers:
           - url: "http://netbird-server:80"
         passHostHeader: true
 
     netbird-server-h2c:
       loadBalancer:
+        serversTransport: netbird-longlived
         servers:
           - url: "h2c://netbird-server:80"
         passHostHeader: true

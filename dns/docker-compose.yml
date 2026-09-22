@@ -23,6 +23,10 @@ services:
       # Required for Docker: listen on all interfaces so DNS works from all networks
       - FTLCONF_dns_listeningMode=ALL
       - FTLCONF_dns_upstreams=9.9.9.9
+      # Pin NTP upstream: pool.ntp.org round-robin keeps handing dead members
+      # (e.g. 196.44.136.x) -> "No valid NTP replies received" warnings.
+      # time.cloudflare.com is anycast and always answers. Alternative: ntp.se
+      - FTLCONF_ntp_sync_server=time.cloudflare.com
       # Optional: use local unbound (same compose) for recursive DNS
       # - FTLCONF_dns_upstreams=172.44.0.8#5053
       # - FTLCONF_dns_upstreams=192.168.1.24#5153  # e.g. Cloudflared DoH proxy

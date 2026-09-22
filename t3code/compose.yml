@@ -1,0 +1,117 @@
+# T3 Code + Cursor CLI on Unraid
+#
+# Pin T3_VERSION in the Dockerfile to the desktop app release. A newer client
+# talking to an older `t3 serve` fails with decodeJsonError / Internal error.
+#
+# Setup:
+#   1. docker build -t t3code:local .
+#   2. docker compose up -d
+#   3. docker exec -it -u t3 t3code agent login
+#   4. docker exec -it -u t3 t3code gh auth login
+#   5. Desktop: Settings → Connections → Add environment → SSH launch
+#        target: t3@100.113.194.104:2223
+
+x-default: &default
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "100m"
+      max-file: "3"
+
+services:
+  t3code:
+    <<: *default
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: t3code:local
+    container_name: t3code
+    hostname: t3code
+    # Reap orphaned children (language servers, sshd sessions, zed-remote, etc.).
+    # Without this, `t3 serve` becomes PID 1 after entrypoint `exec` and zombies pile up.
+    init: true
+    # root starts sshd, then drops to uid 1000 for `t3 serve`.
+    user: "0:0"
+    group_add:
+      - "281"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - HOME=/home/t3
+      - CURSOR_API_KEY=${CURSOR_API_KEY:-}
+      - GH_TOKEN=${GH_TOKEN:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-jacob}
+      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-}
+      - GIT_COMMITTER_NAME=${GIT_AUTHOR_NAME:-jacob}
+      - GIT_COMMITTER_EMAIL=${GIT_AUTHOR_EMAIL:-}
+      - T3_SSH_PUBKEY=${T3_SSH_PUBKEY:-}
+    volumes:
+      - /mnt/user/appdata/t3code/home:/home/t3
+      - /mnt/user/documents/compose:/home/t3/compose
+      - /mnt/user/documents/dev:/home/t3/dev
+      - /mnt/user/documents/work:/home/t3/work
+      - /mnt/user/documents/projects:/home/t3/projects
+      - /mnt/user/documents/compose:/workspace/compose
+      - /mnt/user/documents/dev:/workspace/dev
+      - /mnt/user/documents/work:/workspace/work
+      - /mnt/user/documents/projects:/workspace/projects
+      - /mnt/user/appdata/t3code/ssh-hostkeys:/etc/ssh/host-keys
+      - ./entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/localtime:/etc/localtime:ro
+    working_dir: /workspace
+    command:
+      - t3
+      - serve
+      - --host
+      - 0.0.0.0
+      - --port
+      - "3773"
+      - --base-dir
+      - /home/t3/.t3
+    # Use Pi-hole over its bridge address. The Unraid host cannot reach
+    # Pi-hole's 10.0.0.53 macvlan address directly. Static dns_net IP so a
+    # restart cannot steal Pi-hole's 172.44.0.2 (same race as deepseek-harness).
+    dns:
+      - 172.44.0.2
+    networks:
+      npm_services:
+      dns_net:
+        ipv4_address: 172.44.0.26
+      br0_docker:
+        ipv4_address: 10.0.0.26
+    # NOTE: Host port publishes are cleared when this container joins macvlan
+    # (br0_docker). Netbird :2223/:3773 are exposed by t3code-gateway below.
+
+  # Publishes SSH + T3 onto the Netbird interface. Needed because Docker drops
+  # PortBindings on the main container once it attaches to br0 macvlan.
+  t3code-gateway:
+    <<: *default
+    image: alpine/socat:1.8.0.0
+    container_name: t3code-gateway
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        socat TCP-LISTEN:2223,fork,reuseaddr TCP:t3code:22 &
+        socat TCP-LISTEN:3773,fork,reuseaddr TCP:t3code:3773 &
+        wait -n
+    ports:
+      - "100.113.194.104:2223:2223"
+      - "100.113.194.104:3773:3773"
+    networks:
+      - npm_services
+    depends_on:
+      - t3code
+
+networks:
+  npm_services:
+    external: true
+  dns_net:
+    external: true
+    name: dns_dns_net
+  br0_docker:
+    external: true

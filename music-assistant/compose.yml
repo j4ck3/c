@@ -2,7 +2,7 @@ services:
   music-assistant:
     image: ghcr.io/music-assistant/server:latest
     container_name: music-assistant
-    restart: unless-stopped
+    restart: "no"
     network_mode: host
     volumes:
       - /mnt/user/appdata/music-assistant/data:/data

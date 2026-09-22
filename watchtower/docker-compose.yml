@@ -1,35 +1,31 @@
 services:
   watchtower:
-    image: containrrr/watchtower:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: watchtower-defer:local
     container_name: watchtower
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
+      - TZ=Europe/Stockholm
       - DOCKER_API_VERSION=1.44
       - WATCHTOWER_CLEANUP=true
-      # Check less frequently to reduce churn and Docker image pressure.
-      - WATCHTOWER_POLL_INTERVAL=21600
+      # Only explicitly labelled, noncritical containers may be updated.
+      - WATCHTOWER_LABEL_ENABLE=true
+      # Weekly: Wednesday 06:30, clear of 03:00 backups, 04:00 GoBackup,
+      # daily/weekly cron around 04:30, and Sunday's 05:00 mover/parity jobs.
+      - WATCHTOWER_SCHEDULE=0 30 6 * * 3
+      # Skip images newer than ~1.5 days (PR build only supports whole days; 2 = conservative).
+      - WATCHTOWER_DEFER_DAYS=2
       - WATCHTOWER_INCLUDE_STOPPED=false
       - WATCHTOWER_INCLUDE_RESTARTING=false
-      # Skip local/custom images that are not pullable from a registry.
-      - WATCHTOWER_DISABLE_CONTAINERS=gluetun-dns gluetun zonos_container soulify postgres 3dcommerce_prod_db muddra_prod_db erpnext_backend erpnext_frontend erpnext_websocket erpnext_queue_short erpnext_queue_long erpnext_scheduler erpnext_configurator erpnext_create_site erpnext_mariadb erpnext_redis_cache erpnext_redis_queue erpnext_redis_socketio penpot-mcp openclaw-gateway zeroclaw openviking backup-scheduler
-      - WATCHTOWER_NOTIFICATIONS=shoutrrr
-      - WATCHTOWER_NOTIFICATION_URL=telegram://${WATCHTOWER_TELEGRAM_BOT_TOKEN}@telegram?chats=${WATCHTOWER_TELEGRAM_CHAT}
-      - WATCHTOWER_ROLLING_RESTART=true
+      - WATCHTOWER_ROLLING_RESTART=false
       - DOCKER_CONFIG=/config
-      # HTTP API for webhook triggers
-      - WATCHTOWER_HTTP_API_UPDATE=true
-      - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_API_TOKEN}
-      - WATCHTOWER_HTTP_API_PERIODIC_POLLS=true
-    expose:
-      - "8080"
+      # HTTP API disabled until WATCHTOWER_API_TOKEN is set in .env
+      - WATCHTOWER_HTTP_API_UPDATE=false
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /home/ubuntu/.docker:/config:ro
-    networks:
-      - traefik
     restart: unless-stopped
-
-networks:
-  traefik:
-    external: true

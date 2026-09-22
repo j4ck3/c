@@ -1,0 +1,40 @@
+services:
+  openviking:
+    image: ghcr.io/volcengine/openviking:latest
+    container_name: openviking
+    restart: unless-stopped
+    ports:
+      # Direct LAN access; Web Studio is served at http://<host>:1933/studio
+      - "${OPENVIKING_SERVER_PORT:-1933}:1933"
+    volumes:
+      # All persistent state (ov.conf, ovcli.conf, data) lives here
+      - /mnt/user/appdata/openviking:/app/.openviking
+    environment:
+      OPENVIKING_SERVER_PORT: ${OPENVIKING_SERVER_PORT:-1933}
+      # Injected into ov.conf via ${OPENROUTER_API_KEY} expansion — no key on disk in ov.conf
+      # OpenRouter serves both embeddings (openai/text-embedding-3-large) and VLM (openai/gpt-4o)
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    networks:
+      - npm_services
+    healthcheck:
+      test: ["CMD", "openviking-entrypoint", "--healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    # --- Optional: public HTTPS via your existing Traefik (npm_services) ---
+    # Uncomment and point a DNS record at this host to expose as
+    # https://openviking.hjacke.com (server has api_key auth enabled):
+    #
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.openviking.rule=Host(`openviking.hjacke.com`)"
+    #   - "traefik.http.routers.openviking.entrypoints=websecure"
+    #   - "traefik.http.routers.openviking.tls=true"
+    #   - "traefik.http.routers.openviking.tls.certresolver=letsencrypt"
+    #   - "traefik.http.routers.openviking.service=openviking"
+    #   - "traefik.http.services.openviking.loadbalancer.server.port=1933"
+
+networks:
+  npm_services:
+    external: true

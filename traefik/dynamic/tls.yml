@@ -6,6 +6,9 @@ tls:
         certFile: /etc/traefik/certs/rjhdesign_cloudflare_origin_cert.pem
         keyFile: /etc/traefik/certs/rjhdesign_cloudflare_origin_key.pem
   certificates:
+    # Exact-host LE cert so m.hjacke.com is not served the untrusted Origin wildcard.
+    - certFile: /etc/traefik/certs/m.hjacke.com.pem
+      keyFile: /etc/traefik/certs/m.hjacke.com-key.pem
     # Certificates that exist in /etc/traefik/certs. hjacke.com uses certresolver=letsencrypt in router labels.
     - certFile: /etc/traefik/certs/rjhdesign_cloudflare_origin_cert.pem
       keyFile: /etc/traefik/certs/rjhdesign_cloudflare_origin_key.pem

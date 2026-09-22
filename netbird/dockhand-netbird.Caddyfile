@@ -1,19 +1,125 @@
-{
-	admin off
-	servers {
-		protocols h1 h2
-	}
-}
-
-https://dockhand.netbird.hjacke.com {
-	bind 100.113.194.104
+(netbird_tls) {
 	tls {
-		dns cloudflare {env.CF_DNS_API_TOKEN}
+		dns cloudflare {$CF_DNS_API_TOKEN}
 	}
-	reverse_proxy 127.0.0.1:3000
 }
 
-http://dockhand.netbird.hjacke.com {
-	bind 100.113.194.104
-	redir https://{host}{uri} permanent
+# Retry dials across brief Docker/Netbird FORWARD gaps (default dial is 3s, no retry).
+(reliable_proxy) {
+	reverse_proxy {args[0]} {
+		lb_try_duration 8s
+		lb_try_interval 200ms
+		transport http {
+			dial_timeout 8s
+		}
+	}
+}
+
+dockhand.netbird.hjacke.com {
+	import netbird_tls
+	import reliable_proxy dockhand:3000
+}
+
+sonarr.netbird.hjacke.com {
+	import netbird_tls
+	import reliable_proxy sonarr:8989
+}
+
+radarr.netbird.hjacke.com {
+	import netbird_tls
+	import reliable_proxy radarr:7878
+}
+
+bazarr.netbird.hjacke.com {
+	import netbird_tls
+	import reliable_proxy bazarr:6767
+}
+
+rss.netbird.hjacke.com {
+	import netbird_tls
+	import reliable_proxy freshrss:80
+}
+
+torrent.netbird.hjacke.com {
+	import netbird_tls
+	import reliable_proxy gluetun_torrents:8080
+}
+
+netdata.netbird.hjacke.com {
+	import netbird_tls
+	import reliable_proxy netdata:19999
+}
+
+nicotine.netbird.hjacke.com {
+	import netbird_tls
+	import reliable_proxy gluetun_torrents:6565
+}
+
+qui.netbird.hjacke.com {
+	import netbird_tls
+	import reliable_proxy qui:7476
+}
+
+files.netbird.hjacke.com {
+	import netbird_tls
+	import reliable_proxy filebrowser:80
+}
+
+t3code.netbird.hjacke.com {
+	import netbird_tls
+	# Long-lived WSS for the desktop/mobile client; avoid proxy idle cuts.
+	reverse_proxy t3code:3773 {
+		flush_interval -1
+		lb_try_duration 8s
+		lb_try_interval 200ms
+		transport http {
+			read_timeout 0
+			write_timeout 0
+			dial_timeout 10s
+		}
+		header_up Host {host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+}
+
+# DeepSeek Harness Web UI (unauthenticated agent — Netbird peers only).
+code.netbird.hjacke.com {
+	import netbird_tls
+	reverse_proxy deepseek-harness:3080 {
+		flush_interval -1
+		lb_try_duration 8s
+		lb_try_interval 200ms
+		transport http {
+			read_timeout 0
+			write_timeout 0
+			dial_timeout 10s
+		}
+		header_up Host {host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+}
+
+trilium.netbird.hjacke.com {
+	import netbird_tls
+	import reliable_proxy trilium:8080
+}
+
+# Hermes Agent dashboard (basic auth in-app; Chat tab uses a long-lived WebSocket).
+agent.netbird.hjacke.com {
+	import netbird_tls
+	reverse_proxy hermes:9119 {
+		flush_interval -1
+		lb_try_duration 8s
+		lb_try_interval 200ms
+		transport http {
+			read_timeout 0
+			write_timeout 0
+			dial_timeout 10s
+		}
+		header_up Host {host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
 }

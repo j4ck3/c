@@ -1,0 +1,36 @@
+#!/usr/bin/env node
+/**
+ * DSH 0.1.2-rc.1 parses the forwarded Host header under HTTP, then compares
+ * it literally with the browser's HTTPS Origin. Reverse proxies that forward
+ * Host:443 therefore make every browser RPC return 403 even though the host
+ * is explicitly trusted. Compare normalized hostname and effective port.
+ */
+import { readFileSync, writeFileSync } from "node:fs";
+
+const file =
+  "/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-client-connection/lib/index.js";
+
+const from = `\ttry {
+\t\treturn new URL(origin).host === hostUrl.host;
+\t} catch {
+\t\treturn false;
+\t}`;
+
+const to = `\ttry {
+\t\tconst originUrl = new URL(origin);
+\t\tconst originPort = originUrl.port || (originUrl.protocol === "https:" ? "443" : "80");
+\t\tconst hostPort = hostUrl.port || (originUrl.protocol === "https:" ? "443" : "80");
+\t\treturn originUrl.hostname === hostUrl.hostname && originPort === hostPort;
+\t} catch {
+\t\treturn false;
+\t}`;
+
+const source = readFileSync(file, "utf8");
+if (source.includes(to) && !source.includes(from)) {
+  console.log(`already patched proxy HTTPS origin in ${file}`);
+} else if (!source.includes(from)) {
+  throw new Error(`proxy HTTPS origin patch pattern not found in ${file}`);
+} else {
+  writeFileSync(file, source.replace(from, to));
+  console.log(`patched proxy HTTPS origin in ${file}`);
+}

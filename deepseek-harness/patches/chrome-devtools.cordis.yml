@@ -1,0 +1,20 @@
+# Official Chrome DevTools MCP. Chromium is launched automatically inside the
+# Harness container so browser and Harness-launched dev servers share localhost.
+- insert:
+    - id: mcp-chrome-devtools
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: chrome-devtools
+        transport: stdio
+        command: /usr/local/bin/npx
+        args:
+          - '-y'
+          - 'chrome-devtools-mcp@latest'
+          - '--headless'
+          - '--isolated'
+          - '--executable-path=/usr/bin/chromium'
+          - '--chrome-arg=--no-sandbox'
+          - '--chrome-arg=--disable-dev-shm-usage'
+          - '--allow-unrestricted-paths'
+        failOnStartupError: true
+        toolCallTimeoutMs: 120000

@@ -20,5 +20,4 @@ services:
             - PGID=100
             - TZ=Europe/Stockholm
             - PLEX_PASS=yes
-            - PLEX_CLAIM=claim-hzqVrknZUEoSHTJvvxrx
         network_mode: host

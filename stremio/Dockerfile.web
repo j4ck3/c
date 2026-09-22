@@ -1,0 +1,17 @@
+FROM alpine:3.22 AS fetch
+
+RUN apk add --no-cache ca-certificates curl unzip
+
+ARG STREMIO_WEB_URL=https://github.com/Stremio/stremio-web/releases/download/v5.0.0-beta.39/stremio-web.zip
+ARG STREMIO_WEB_SHA256=581451348995898a037f029883a2bbd6eeb3fbfd2059851c255812cde148e2f3
+
+RUN curl --fail --location --output /tmp/stremio-web.zip "${STREMIO_WEB_URL}" \
+    && echo "${STREMIO_WEB_SHA256}  /tmp/stremio-web.zip" | sha256sum -c - \
+    && unzip /tmp/stremio-web.zip -d /tmp/stremio-web
+
+FROM nginx:alpine
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=fetch /tmp/stremio-web/build/ /usr/share/nginx/html/
+
+EXPOSE 8090

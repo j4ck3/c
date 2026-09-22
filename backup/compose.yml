@@ -24,7 +24,8 @@ services:
       - /mnt/user/system:/data/system:ro
       - /mnt/user/trilium:/data/trilium:ro
       - ./scripts:/scripts:ro
-      - ./config:/config:ro
+      # rw so rclone can persist OneDrive OAuth token refreshes
+      - ./config:/config
       - /root/.ssh:/root/.ssh:ro
       - restic-cache:/root/.cache/restic
       # Host path so Promtail can read logs for Grafana backup monitoring

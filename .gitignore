@@ -24,6 +24,9 @@ komodo/app/
 codeberg-runner/secrets/
 codeberg-runner/.env
 
+t3code/.env
+deepseek-harness/.env
+
 guacamole/.env
 guacamole/data/
 guacamole/nginx/ssl/

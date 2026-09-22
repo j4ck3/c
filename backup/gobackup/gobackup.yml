@@ -1,6 +1,11 @@
 # GoBackup config - complementary backup layer (Web UI, archive, notifications)
 # See: https://gobackup.github.io/configuration
 
+# Build temp archives on the cache-mounted volume, NOT inside the container
+# filesystem (which lives in docker.img). Writing the temp tarball into
+# docker.img was filling it to 100% every run.
+workdir: /backups/gobackup/tmp
+
 web:
   host: 0.0.0.0
   port: 2703
@@ -23,6 +28,10 @@ models:
         - "*.log"
         - node_modules
         - .git
+        # Never archive disk images. The system share contains docker.img
+        # (~200 GB) and libvirt.img; taring them is pointless and was the
+        # root cause of the daily docker.img 100% utilization alerts.
+        - "*.img"
     storages:
       local:
         type: local

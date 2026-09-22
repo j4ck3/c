@@ -51,6 +51,9 @@ services:
     devices:
       - /dev/net/tun
     network_mode: host
+    extra_hosts:
+      # Traefik on npm_services — required for management API reachability from host network.
+      - "netbird.hjacke.com:172.25.0.254"
     environment:
       - NB_SETUP_KEY=${NB_SETUP_KEY:?Set NB_SETUP_KEY in .env or environment}
       - NB_MANAGEMENT_URL=https://netbird.hjacke.com/
@@ -60,6 +63,9 @@ services:
       - NB_ALLOW_SERVER_SSH=true
       # Use machine identity (ACL-only); omit if you use IdP/JWT for SSH
       - NB_DISABLE_SSH_AUTH=true
+      # Required so mesh SSH accepts root (Unraid) and SFTP for stack copy
+      - NB_ENABLE_SSH_ROOT=true
+      - NB_ENABLE_SSH_SFTP=true
     volumes:
       - netbird_client_data:/var/lib/netbird
     depends_on:
@@ -70,11 +76,50 @@ services:
         max-size: "100m"
         max-file: "2"
 
+  # HTTPS for *.netbird.hjacke.com on the mesh IP (requires netbird-client connected).
+  dockhand-netbird-proxy:
+    image: dockhand-caddy-cloudflare:local
+    container_name: dockhand-netbird-proxy
+    <<: *default
+    env_file:
+      - ../traefik/.env.local
+    ports:
+      - "100.113.194.104:80:80"
+      - "100.113.194.104:443:443"
+    volumes:
+      - ./dockhand-netbird.Caddyfile:/etc/caddy/Caddyfile:ro
+      - dockhand_caddy_data:/data
+      - dockhand_caddy_config:/config
+    networks:
+      - npm_services
+    depends_on:
+      - netbird-client
+
+  # Docker bridge packets hit host iptables (br_netfilter). Netbird
+  # rebuilds FORWARD on peer churn and Caddy then cannot dial Trilium.
+  netbird-docker-protect:
+    <<: *default
+    image: alpine:3.20
+    container_name: netbird-docker-protect
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    volumes:
+      - /mnt/user/documents/compose/netbird/protect-docker-bridge.sh:/protect-docker-bridge.sh:ro
+    command:
+      - /bin/sh
+      - -c
+      - apk add --no-cache iptables >/dev/null && exec sh /protect-docker-bridge.sh
+
 volumes:
   netbird_data:
     name: netbird_data
   netbird_client_data:
     name: netbird_client_data
+  dockhand_caddy_data:
+  dockhand_caddy_config:
 
 networks:
   npm_services:

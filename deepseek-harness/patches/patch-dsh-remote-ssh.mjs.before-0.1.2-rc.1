@@ -1,0 +1,155 @@
+#!/usr/bin/env node
+/**
+ * dsh-remote-ssh@0.2.4 targets DSH 0.1.0-rc.6. On 0.1.1-rc.2 two bugs make
+ * "Add workspace" / file-open show Error: forbidden:
+ *
+ * 1. settings.plugin.item is now a keyed slot. Registering it with id/order
+ *    throws and aborts plugin boot; the Remote SSH client never mounts, while
+ *    its host patch has already disabled the official directory picker.
+ * 2. Its /plugins/dsh-remote-ssh/* fence compares Origin.host === Host.host
+ *    with no port canonicalization, so HTTPS Origin (no port) vs Host:443
+ *    (or Origin: null) returns JSON { error: "forbidden" }. The client
+ *    throws that string, which is exactly the dialog copy.
+ */
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+const ROOT = join(
+  process.env.DSH_HOME ?? join(homedir(), ".dsh"),
+  "profiles/web/node_modules/dsh-remote-ssh",
+);
+
+function patchFile(file, replacements) {
+  if (!existsSync(file)) {
+    throw new Error(`dsh-remote-ssh file not found: ${file}`);
+  }
+  let src = readFileSync(file, "utf8");
+  for (const { from, to, label } of replacements) {
+    if (src.includes(to) && !src.includes(from)) {
+      console.log(`already patched ${label} in ${file}`);
+      continue;
+    }
+    if (!src.includes(from)) {
+      throw new Error(`patch ${label}: pattern not found in ${file}`);
+    }
+    src = src.replace(from, to);
+  }
+  writeFileSync(file, src);
+  console.log(`patched ${file}`);
+}
+
+const clientFrom = `			ctx.slots.inject("settings.plugin.item", () => ctx.slots.register({
+				name: "settings.plugin.item",
+				id: "remote-ssh",
+				order: 30,
+				inject: () => ({ t })
+			}, RemoteSshPluginCard));`;
+
+const clientTo = `			ctx.slots.inject("settings.plugin.item", () => ctx.slots.register({
+				name: "settings.plugin.item",
+				key: "remote-ssh",
+				inject: () => ({ t })
+			}, RemoteSshPluginCard));`;
+
+const trustFrom = `function trustedRequest(req) {
+	if (req.headers["sec-fetch-site"] === "cross-site") return false;
+	const host = req.headers.host;
+	const origin = req.headers.origin;
+	if (host === void 0 || origin === void 0) return origin === void 0;
+	try {
+		return new URL(origin).host === new URL(\`http://\${host}\`).host;
+	} catch {
+		return false;
+	}
+}`;
+
+const trustTo = `function defaultPort(protocol) {
+	return protocol === "https:" ? "443" : "80";
+}
+function originPort(url) {
+	return url.port === "" ? defaultPort(url.protocol) : url.port;
+}
+function hostHeaderPort(hostUrl, originIsHttps) {
+	if (hostUrl.port !== "") return hostUrl.port;
+	return originIsHttps ? "443" : "80";
+}
+function trustedRequest(req) {
+	if (req.headers["sec-fetch-site"] === "cross-site") return false;
+	const host = req.headers.host;
+	const origin = req.headers.origin;
+	if (host === void 0) return false;
+	if (origin === void 0 || origin === "" || origin === "null") return true;
+	try {
+		const originUrl = new URL(origin);
+		const hostUrl = new URL("http://" + host);
+		if (originUrl.hostname !== hostUrl.hostname) return false;
+		return originPort(originUrl) === hostHeaderPort(hostUrl, originUrl.protocol === "https:");
+	} catch {
+		return false;
+	}
+}`;
+
+if (!existsSync(ROOT)) {
+  console.log("dsh-remote-ssh not installed; skip");
+  process.exit(0);
+}
+
+patchFile(join(ROOT, "lib/client.js"), [
+  { from: clientFrom, to: clientTo, label: "settings.plugin.item key" },
+]);
+patchFile(join(ROOT, "lib/web.js"), [
+  { from: trustFrom, to: trustTo, label: "trustedRequest port/null origin" },
+]);
+
+// Stable VS Code Agent Host now speaks AHP ^0.9.0. Offer it before 0.8 so
+// initialize succeeds against current code CLI downloads.
+const ahpLib = join(ROOT, "lib/src-D6lNt3RG.js");
+if (existsSync(ahpLib)) {
+  let ahpSrc = readFileSync(ahpLib, "utf8");
+  const ahpWant =
+    `[.../* @__PURE__ */ new Set([...["0.9.0", "0.8.0"], ...SUPPORTED_PROTOCOL_VERSIONS])]`;
+  const ahpOld =
+    `[.../* @__PURE__ */ new Set([...["0.8.0"], ...SUPPORTED_PROTOCOL_VERSIONS])]`;
+  if (ahpSrc.includes(ahpWant)) {
+    console.log(`already patched AHP offer 0.9.0 in ${ahpLib}`);
+  } else if (ahpSrc.includes(ahpOld)) {
+    writeFileSync(ahpLib, ahpSrc.replace(ahpOld, ahpWant));
+    console.log(`patched ${ahpLib}`);
+  } else {
+    throw new Error(`patch AHP offer 0.9.0: pattern not found in ${ahpLib}`);
+  }
+}
+
+// Remote glob/grep spawn the harness-bundled @vscode/ripgrep path. On POSIX
+// remotes that file does not exist; use PATH `rg` instead (INSTALL.md prereq).
+const routerSubprocess = join(ROOT, "lib/router-subprocess.js");
+if (existsSync(routerSubprocess)) {
+  let routerSrc = readFileSync(routerSubprocess, "utf8");
+  const rgMarker = 'executable.endsWith("-rg")) return "rg";';
+  if (routerSrc.includes(rgMarker)) {
+    console.log(`already patched remote ripgrep uses PATH rg in ${routerSubprocess}`);
+  } else {
+    const rgFrom =
+      'function remoteExecutable(executable) {\n\tif (!/^(?:[A-Za-z]:[\\\\/]|\\\\\\\\)/.test(executable)) return executable;\n\treturn win32.basename(executable).replace(/\\.exe$/i, "");\n}';
+    const rgTo =
+      'function remoteExecutable(executable) {\n\tif (/^(?:[A-Za-z]:[\\\\/]|\\\\\\\\)/.test(executable)) return win32.basename(executable).replace(/\\.exe$/i, "");\n\tif (executable.includes("@vscode/ripgrep") || executable.includes("ripgrep-linux") || executable.endsWith("-rg")) return "rg";\n\treturn executable;\n}';
+    if (!routerSrc.includes(rgFrom)) {
+      throw new Error(`patch remote ripgrep uses PATH rg: pattern not found in ${routerSubprocess}`);
+    }
+    writeFileSync(routerSubprocess, routerSrc.replace(rgFrom, rgTo));
+    console.log(`patched ${routerSubprocess}`);
+  }
+}
+
+// Keep the plugin on the AHP client that can negotiate 0.9 with current Agent Host.
+const ahpPkg = join(ROOT, "node_modules/@microsoft/agent-host-protocol/package.json");
+for (const pkgPath of [ahpPkg]) {
+  if (!existsSync(pkgPath)) continue;
+  const version = JSON.parse(readFileSync(pkgPath, "utf8")).version;
+  if (version === "0.9.0" || version.startsWith("0.9.")) {
+    console.log(`AHP client ${version} ok at ${pkgPath}`);
+  } else {
+    console.log(`AHP client ${version} at ${pkgPath} — need 0.9.x (entrypoint should reinstall)`);
+  }
+}

@@ -1,0 +1,46 @@
+# Hermes Agent (NousResearch) — gateway + web dashboard
+# Docs: https://hermes-agent.nousresearch.com/docs/user-guide/docker
+# Web UI: https://agent.netbird.hjacke.com (via dockhand-netbird-proxy Caddy, Netbird peers only)
+# Dashboard auth is mandatory on non-loopback binds — basic-auth creds live in .env.
+# Data (config, .env with API keys, sessions, memories, skills) persists in appdata.
+
+services:
+  hermes:
+    image: nousresearch/hermes-agent:latest
+    container_name: hermes
+    restart: unless-stopped
+    command: ["gateway", "run"]
+    env_file: .env
+    environment:
+      # Unraid convention (nobody:users) so appdata stays readable over SMB
+      - PUID=99
+      - PGID=100
+      - HERMES_DASHBOARD=1
+      # In-browser Chat tab (embedded TUI over WebSocket)
+      - HERMES_DASHBOARD_TUI=1
+    shm_size: 1g
+    volumes:
+      - /mnt/user/appdata/hermes:/opt/data
+    networks:
+      - npm_services
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+    healthcheck:
+      # Auth gate returns a redirect/login page — any HTTP response means the dashboard is up.
+      test: ["CMD-SHELL", "curl -so /dev/null http://127.0.0.1:9119/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "2"
+
+networks:
+  npm_services:
+    external: true
