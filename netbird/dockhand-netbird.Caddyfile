@@ -65,10 +65,15 @@ files.netbird.hjacke.com {
 	import reliable_proxy filebrowser:80
 }
 
-t3code.netbird.hjacke.com {
+# DeepSeek Harness Web UI (unauthenticated agent — Netbird peers only).
+code.netbird.hjacke.com {
 	import netbird_tls
-	# Long-lived WSS for the desktop/mobile client; avoid proxy idle cuts.
-	reverse_proxy t3code:3773 {
+	@outside_netbird not remote_ip 100.113.0.0/16
+	respond @outside_netbird "NetBird connection required." 403
+	reverse_proxy deepseek-harness:3080 {
+		# dsh issues SameSite=Strict; Lax keeps the cookie on top-level links
+		# opened from other apps and on PWA launches.
+		header_down Set-Cookie "SameSite=Strict" "SameSite=Lax"
 		flush_interval -1
 		lb_try_duration 8s
 		lb_try_interval 200ms
@@ -83,16 +88,14 @@ t3code.netbird.hjacke.com {
 	}
 }
 
-# DeepSeek Harness Web UI (unauthenticated agent — Netbird peers only).
-code.netbird.hjacke.com {
+
+# OpenDesign web studio with DeepSeek Harness runtime.
+design.netbird.hjacke.com {
 	import netbird_tls
-	reverse_proxy deepseek-harness:3080 {
-		flush_interval -1
+	reverse_proxy open-design:7456 {
 		lb_try_duration 8s
 		lb_try_interval 200ms
 		transport http {
-			read_timeout 0
-			write_timeout 0
 			dial_timeout 10s
 		}
 		header_up Host {host}
@@ -106,20 +109,48 @@ trilium.netbird.hjacke.com {
 	import reliable_proxy trilium:8080
 }
 
-# Hermes Agent dashboard (basic auth in-app; Chat tab uses a long-lived WebSocket).
-agent.netbird.hjacke.com {
+# Roundcube for personal Outlook mail. No public ingress is permitted.
+mail.netbird.hjacke.com {
 	import netbird_tls
-	reverse_proxy hermes:9119 {
+	@outside_netbird not remote_ip 100.113.0.0/16
+	respond @outside_netbird "NetBird connection required." 403
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy roundcube:8000 {
+		lb_try_duration 8s
+		lb_try_interval 200ms
+		transport http {
+			dial_timeout 8s
+		}
+		header_up Host mail.netbird.hjacke.com
+		header_up X-Forwarded-Host mail.netbird.hjacke.com
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Port 443
+	}
+}
+
+# Home Assistant (LAN host 10.0.0.23). X-Forwarded-For is stripped so HA
+# accepts the proxy without http.trusted_proxies; HA sees tower as the client.
+ha.netbird.hjacke.com {
+	import netbird_tls
+	@outside_netbird not remote_ip 100.113.0.0/16
+	respond @outside_netbird "NetBird connection required." 403
+	reverse_proxy 10.0.0.23:8123 {
+		header_up -X-Forwarded-For
+		header_up -X-Forwarded-Proto
+		header_up -X-Forwarded-Host
 		flush_interval -1
 		lb_try_duration 8s
 		lb_try_interval 200ms
 		transport http {
-			read_timeout 0
-			write_timeout 0
-			dial_timeout 10s
+			dial_timeout 8s
 		}
-		header_up Host {host}
-		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-Host {host}
 	}
+}
+
+# HSTAB work-shift tracker (compose/hstab). No auth in the app, so NetBird peers only.
+hstab.netbird.hjacke.com {
+	import netbird_tls
+	@outside_netbird not remote_ip 100.113.0.0/16
+	respond @outside_netbird "NetBird connection required." 403
+	import reliable_proxy hstab:3070
 }

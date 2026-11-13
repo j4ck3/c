@@ -105,11 +105,6 @@ patchFile(join(ROOT, "lib/manager.js"), [
     to: ``,
     label: "removed settingsNamespace import",
   },
-  {
-    from: `const SETTINGS_NAMESPACE = settingsNamespace("remote-ssh");`,
-    to: `const SETTINGS_NAMESPACE = "remote-ssh";`,
-    label: "settings namespace string",
-  },
 ]);
 
 patchFile(join(ROOT, "lib/client.js"), [
@@ -152,16 +147,23 @@ if (existsSync(ahpLib)) {
   }
 }
 
-// Reconnect transparently after the remote machine or Agent Host restarts.
-// Workspace providers retain this RemoteSshRuntime instance, so replacing its
-// ready promise repairs every cached filesystem/shell context underneath it.
+// The distro OSS `code` wrapper can be present on PATH but unable to spawn its
+// Electron tunnel binary after a package change. Prefer the official private
+// CLI provisioned on each SSH host; PATH remains a fallback if it is absent.
+const bootstrapLib = ahpLib;
+const bootstrapFrom = '"if [ \\"$dsh_code\\" = code ] && ! command -v \\"$dsh_code\\" >/dev/null 2>&1 && [ -x \\"$HOME/.dsh-remote-ssh/cli/bin/code\\" ]; then dsh_code=\\"$HOME/.dsh-remote-ssh/cli/bin/code\\"; fi"';
+const bootstrapTo = '"if [ \\"$dsh_code\\" = code ] && [ -x \\"$HOME/.dsh-remote-ssh/cli/bin/code\\" ]; then dsh_code=\\"$HOME/.dsh-remote-ssh/cli/bin/code\\"; fi"';
+patchFile(bootstrapLib, [{ from: bootstrapFrom, to: bootstrapTo, label: "prefer private official CLI" }]);
+
+// Reconnect after Agent Host closure OR failed SSH startup. Defer failed
+// startup retries until the next request so a transient outage is not cached.
 const reconnectFrom = `\tasync getConnection() {
 \t\tif (this.disposed) throw new Error("Remote SSH service is disposing");
 \t\tconst connection = await this.ready;
 \t\tif (this.disposed) throw new Error("Remote SSH service is disposing");
 \t\treturn connection;
 \t}`;
-const reconnectTo = `\tasync getConnection() {
+const reconnectPrevious = `\tasync getConnection() {
 \t\tif (this.disposed) throw new Error("Remote SSH service is disposing");
 \t\tconst observed = this.ready;
 \t\tlet connection = await observed;
@@ -177,11 +179,39 @@ const reconnectTo = `\tasync getConnection() {
 \t\t}
 \t\treturn connection;
 \t}`;
+const reconnectTo = `\tasync getConnection() {
+\t\tif (this.disposed) throw new Error("Remote SSH service is disposing");
+\t\tif (this.readyFailed) {
+\t\t\tthis.readyFailed = false;
+\t\t\tthis.resetSshAttempt();
+\t\t\tthis.ready = this.open();
+\t\t\tthis.ready.catch(() => {});
+\t\t}
+\t\tconst observed = this.ready;
+\t\tlet connection;
+\t\ttry {
+\t\t\tconnection = await observed;
+\t\t} catch (error) {
+\t\t\tif (this.ready === observed) this.readyFailed = true;
+\t\t\tthrow error;
+\t\t}
+\t\tif (this.disposed) throw new Error("Remote SSH service is disposing");
+\t\tif (connection.client.connectionState.status !== "connected") {
+\t\t\tif (this.ready === observed) {
+\t\t\t\tthis.resetSshAttempt();
+\t\t\t\tthis.ready = this.open();
+\t\t\t\tthis.ready.catch(() => {});
+\t\t\t}
+\t\t\tconnection = await this.ready;
+\t\t\tif (this.disposed) throw new Error("Remote SSH service is disposing");
+\t\t}
+\t\treturn connection;
+\t}`;
 let reconnectSrc = readFileSync(ahpLib, "utf8");
 if (reconnectSrc.includes(reconnectTo)) {
   console.log(`already patched closed-client reconnect in ${ahpLib}`);
-} else if (reconnectSrc.includes(reconnectFrom)) {
-  reconnectSrc = reconnectSrc.replace(reconnectFrom, reconnectTo);
+} else if (reconnectSrc.includes(reconnectPrevious) || reconnectSrc.includes(reconnectFrom)) {
+  reconnectSrc = reconnectSrc.replace(reconnectSrc.includes(reconnectPrevious) ? reconnectPrevious : reconnectFrom, reconnectTo);
   writeFileSync(ahpLib, reconnectSrc);
   console.log(`patched closed-client reconnect in ${ahpLib}`);
 } else {

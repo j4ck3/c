@@ -1,0 +1,80 @@
+/**
+ * Slate skin: variable overrides.
+ * Loaded at the end of variables.less, so these values win over colors.less.
+ * The skin is always rendered in dark mode (see templates/includes/layout.html).
+ */
+
+@page-font-size:                        13px;
+
+@layout-menu-width:                     232px;   // left sidebar (folders) uses this width, see _styles.less
+@layout-header-height:                  48px;
+@layout-footer-height:                  48px;
+@layout-searchbar-height:               32px;
+@layout-touch-header-height:            52px;
+
+@listing-line-height:                   28px;
+@listing-touch-line-height:             44px;
+
+// Accent
+@color-main:                            #5e6ad2;
+@color-link:                            #8b93e6;
+@color-link-hover:                      #aab0ee;
+
+// Black theme palette (dark-mode variables are the ones actually used)
+@slate-bg:                              #000;
+@slate-panel:                           #000;
+@slate-raised:                          #0e0e10;      // popovers, inputs, hover
+@slate-hover:                           #141416;
+@slate-selected:                        #1c1c21;
+@slate-border:                          #1f1f23;
+@slate-border-strong:                   #2c2c32;
+@slate-text:                            #e6e6e9;
+@slate-text-muted:                      #8a8a93;
+@slate-text-faint:                      #5c5c64;
+
+@color-dark-main:                       @color-main;
+@color-dark-background:                 @slate-bg;
+@color-dark-font:                       @slate-text;
+@color-dark-border:                     @slate-border;
+@color-dark-hint:                       @slate-text-muted;
+@color-dark-information:                @color-main;
+@color-dark-success:                    #2f7d4a;
+@color-dark-warning:                    #8a6d1f;
+@color-dark-error:                      #b4413c;
+
+@color-dark-list-selected:              #fff;
+@color-dark-list-selected-background:   @slate-selected;
+@color-dark-list-badge:                 @slate-text;
+@color-dark-list-badge-background:      @slate-border-strong;
+@color-dark-list-deleted:               @slate-text-faint;
+@color-dark-list-droptarget-background: fade(@color-main, 25%);
+@color-dark-list-border:                transparent;
+
+@color-dark-input:                      @slate-text;
+@color-dark-input-border:               @slate-border-strong;
+@color-dark-input-background:           @slate-raised;
+@color-dark-input-focus:                #fff;
+@color-dark-input-border-focus:         @color-main;
+@color-dark-input-background-focus:     @slate-raised;
+@color-dark-input-addon-background:     @slate-hover;
+@color-dark-input-addon-background-focus: @slate-selected;
+@color-dark-checkbox:                   @slate-border-strong;
+@color-dark-checkbox-checked:           @color-main;
+
+@color-dark-btn:                        #fff;
+@color-dark-btn-primary-background:     @color-main;
+@color-dark-btn-secondary-background:   @slate-selected;
+@color-dark-btn-danger-background:      @color-dark-error;
+
+@color-dark-dialog-overlay-background:  fade(black, 75%);
+
+@color-dark-popover-background:         @slate-raised;
+@color-dark-popover-border:             @slate-border-strong;
+
+@color-dark-message-loading:            @slate-selected;
+
+@color-dark-scrollbar-thumb:            @slate-border-strong;
+@color-dark-scrollbar-track:            transparent;
+
+@color-dark-blockquote-0:               #9aa2ea;
+@color-dark-blockquote-0-border:        @slate-border-strong;

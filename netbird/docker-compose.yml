@@ -2,7 +2,7 @@
 # Based on: https://github.com/netbirdio/netbird (combined container, v0.65.0+)
 # Docs: https://docs.netbird.io/selfhosted/external-reverse-proxy#combined-container-setup-v0650
 # Routing for netbird.hjacke.com is in ../traefik/dynamic/netbird.yml (file provider).
-# UDP 3478 must be reachable on the host for STUN (NAT traversal).
+# STUN uses public servers (stuns: in config.yaml); the embedded STUN is disabled.
 
 x-default: &default
   restart: unless-stopped
@@ -30,8 +30,6 @@ services:
     container_name: netbird-server
     networks:
       - npm_services
-    ports:
-      - "3478:3478/udp"
     volumes:
       - netbird_data:/var/lib/netbird
       - ./config.yaml:/etc/netbird/config.yaml:ro
@@ -91,7 +89,11 @@ services:
       - dockhand_caddy_data:/data
       - dockhand_caddy_config:/config
     networks:
-      - npm_services
+      npm_services:
+        mac_address: "02:d0:cc:00:00:02"
+        # Fixed address: Roundcube's Apache only accepts requests from this IP
+        # (roundcube/apache-private.conf). Without it a restart can reassign it.
+        ipv4_address: 172.25.0.23
     depends_on:
       - netbird-client
 

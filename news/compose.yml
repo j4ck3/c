@@ -1,0 +1,23 @@
+services:
+  news:
+    image: nginx:alpine
+    container_name: news
+    restart: unless-stopped
+    volumes:
+      - /mnt/user/appdata/news/site:/usr/share/nginx/html:ro
+      - /mnt/user/appdata/news/archive:/usr/share/nginx/lokalt:ro
+      - ./default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - npm_services
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=npm_services
+      - traefik.http.routers.news.entrypoints=websecure
+      - traefik.http.routers.news.rule=Host(`news.hjacke.com`)
+      - traefik.http.routers.news.tls=true
+      - traefik.http.routers.news.tls.certresolver=letsencrypt
+      - traefik.http.services.news.loadbalancer.server.port=80
+
+networks:
+  npm_services:
+    external: true

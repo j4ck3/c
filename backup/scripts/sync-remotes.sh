@@ -26,10 +26,8 @@ if [ -f /.dockerenv ] && [ -d "/backup" ]; then
     BACKUP_SOURCE="/backup"
 elif [ -d "/mnt/cache/backups/restic" ]; then
     BACKUP_SOURCE="/mnt/cache/backups/restic"
-elif [ -d "/mnt/user/backups/restic" ]; then
-    BACKUP_SOURCE="/mnt/user/backups/restic"
 else
-    BACKUP_SOURCE="/mnt/user/backups/restic"  # Default, will fail with clear error
+    BACKUP_SOURCE="/mnt/cache/backups/restic"  # Pool-only default; fail clearly if unavailable
 fi
 
 # Use RCLONE_CONFIG from env if set and valid; otherwise find rclone.conf

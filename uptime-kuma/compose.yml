@@ -1,0 +1,21 @@
+# Uptime Kuma. Ported from the Unraid dockerMan template (my-UptimeKuma.xml).
+#
+# Pinned to the 1.x line: 2.x migrates kuma.db on first start and has no way back.
+# Upgrade deliberately, after a backup of /mnt/user/appdata/uptimekuma.
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    # Default bridge, as under dockerMan. Also avoids allocating a new subnet:
+    # this host's default address pools are exhausted.
+    network_mode: bridge
+    environment:
+      - TZ=Europe/Stockholm
+    ports:
+      - "3001:3001"
+    volumes:
+      - /mnt/user/appdata/uptimekuma:/app/data
+      # Docker monitors (qBittorrent, Plex, pihole) read container state here.
+      # The old template mounted all of /var/run; only the socket is needed.
+      - /var/run/docker.sock:/var/run/docker.sock:ro

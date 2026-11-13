@@ -1,0 +1,53 @@
+# OpenDesign with an embedded DeepSeek Harness runtime.
+ARG OPEN_DESIGN_IMAGE=ghcr.io/nexu-io/od:0.24.0
+ARG DSH_VERSION=0.1.7-rc.1
+ARG OPEN_DESIGN_REF=open-design-v0.24.0
+
+FROM node:24-alpine AS dsh
+ARG DSH_VERSION
+RUN apk add --no-cache g++ git make python3 \
+  && npm config set allow-scripts '@deepseek-ai/dsh-subprocess-local,koffi,node-pty,@google/genai,protobufjs' \
+  && npm install -g "@deepseek-ai/dsh@${DSH_VERSION}" pnpm@10.33.2 node-addon-require-builtin-linux-x64-gnu@0.1.6 --force \
+  && npm cache clean --force
+COPY patch-dsh-reliability.mjs patch-dsh-proxy-origin.mjs /tmp/
+RUN node /tmp/patch-dsh-reliability.mjs \
+  && node /tmp/patch-dsh-proxy-origin.mjs \
+  && ln -s /usr/local/lib/node_modules/node-addon-require-builtin-linux-x64-gnu /usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/node-addon-require-builtin-linux-x64-gnu \
+  && sed -i "/function linuxLibc() {/a\\    if (process.env.NARB_FORCE_GLIBC === '1') return 'glibc';" /usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/node-addon-native-custom-loader/lib/index.js \
+  && sed -i "/function linuxLibc() {/a\\    if (process.env.NARB_FORCE_GLIBC === '1') return 'glibc';" /usr/local/lib/node_modules/node-addon-require-builtin-linux-x64-gnu/node_modules/node-addon-native-custom-loader/lib/index.js \
+  && rm -f /tmp/patch-dsh-*.mjs
+
+FROM node:24-alpine AS open-design-runtime
+ARG OPEN_DESIGN_REF
+RUN apk add --no-cache g++ git make python3
+RUN git clone --depth 1 --branch "${OPEN_DESIGN_REF}" https://github.com/nexu-io/open-design.git /src
+WORKDIR /src
+RUN corepack enable \
+  && corepack prepare pnpm@10.33.2 --activate \
+  && pnpm install --frozen-lockfile --ignore-scripts --filter @open-design/dsh-runtime... \
+  && pnpm --filter @open-design/dsh-runtime build \
+  && mkdir -p /out \
+  && pnpm -C packages/dsh-runtime pack --pack-destination /out \
+  && test "$(find /out -maxdepth 1 -name '*.tgz' | wc -l)" -eq 1
+
+FROM ${OPEN_DESIGN_IMAGE}
+USER root
+RUN apk add --no-cache g++ make python3 gcompat
+COPY --from=dsh /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf ../lib/node_modules/@deepseek-ai/dsh/lib/bin.js /usr/local/bin/dsh \
+  && ln -sf ../lib/node_modules/corepack/dist/pnpm.js /usr/local/bin/pnpm \
+  && ln -sf ../lib/node_modules/corepack/dist/pnpx.js /usr/local/bin/pnpx
+COPY --from=open-design-runtime /out/*.tgz /opt/open-design/dsh-runtime.tgz
+COPY open-design-entrypoint.sh /usr/local/bin/open-design-entrypoint.sh
+RUN chmod 755 /usr/local/bin/open-design-entrypoint.sh \
+  && mkdir -p /app/.od \
+  && chown -R open-design:open-design /app/.od
+
+ENV HOME=/app/.od/home \
+    DSH_HOME=/app/.od/dsh \
+    DSH_BIN=/usr/local/bin/dsh \
+    NARB_FORCE_GLIBC=1 \
+    NARB_DISABLE_NATIVE_CACHE=1
+USER open-design
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/open-design-entrypoint.sh"]
+CMD ["node", "apps/daemon/dist/cli.js", "--no-open"]

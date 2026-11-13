@@ -42,7 +42,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Logging
-LOG_FILE="/mnt/user/backups/logs/backup-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILE="/mnt/cache/backups/logs/backup-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$(dirname "$LOG_FILE")"
 
 # =============================================================================
@@ -412,7 +412,7 @@ main() {
     telegram_summary "$duration_min" "$duration_sec" "$errors" "$(echo -e "$step_results")"
     
     # Clean up old logs (keep last 30 days)
-    find /mnt/user/backups/logs -name "backup-*.log" -mtime +30 -delete 2>/dev/null || true
+    find /mnt/cache/backups/logs -name "backup-*.log" -mtime +30 -delete 2>/dev/null || true
     
     return $errors
 }

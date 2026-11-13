@@ -1,0 +1,21 @@
+<roundcube:include file="includes/layout.html" />
+
+<roundcube:if condition="!env:framed && !env:extwin" />
+	<roundcube:include file="includes/menu.html" />
+	<div id="layout-content" class="selected" role="main">
+		<div class="header">
+			<roundcube:button command="mail" type="link" class="button icon slate-to-mail" label="mail" title="mail" innerclass="inner" />
+			<span class="header-title"></span>
+		</div>
+		<div class="frame-content scroller">
+<roundcube:else />
+	<div id="layout-content" class="selected" role="main">
+		<div class="frame-content scroller">
+<roundcube:endif />
+
+$__page_content
+
+		</div>
+	</div>
+
+<roundcube:include file="includes/footer.html" />

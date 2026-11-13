@@ -66,7 +66,7 @@ count_over_time({job="backup", level="ERROR"}[5m])
 ## Log Sources
 
 Promtail is configured to collect:
-- **Backup logs**: `/mnt/user/backups/logs/*.log`
+- **Backup logs**: `/mnt/cache/backups/logs/*.log`
 - **Docker container logs**: All running containers
 
 ## Data Retention
@@ -109,9 +109,9 @@ docker compose ps
 - Or create dashboard via Grafana UI using the queries above
 
 ### No backup logs in Loki
-- **Path alignment**: Backup-scheduler must write to `/mnt/user/backups/logs` (bind mount in backup compose). If you use a Docker volume for backup logs, Promtail won't see them.
+- **Path alignment**: Backup-scheduler must write to `/mnt/cache/backups/logs` (bind mount in backup compose). If you use a Docker volume for backup logs, Promtail won't see them.
 - Check Promtail is reading logs: `docker compose logs promtail | grep backup`
-- Verify log files exist: `ls -la /mnt/user/backups/logs/`
+- Verify log files exist: `ls -la /mnt/cache/backups/logs/`
 - Check Loki is receiving data: `curl http://localhost:3100/loki/api/v1/labels`
 
 ### Grafana not accessible via domain

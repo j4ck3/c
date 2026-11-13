@@ -1,0 +1,18 @@
+# FiveFilters Full-Text RSS. Ported from the Unraid dockerMan template
+# (my-fivefilters-full-text-rss.xml). Web UI and API on http://10.0.0.24:6363.
+services:
+  fivefilters-full-text-rss:
+    image: heussd/fivefilters-full-text-rss:latest
+    container_name: fivefilters-full-text-rss
+    restart: unless-stopped
+    # Default bridge, as under dockerMan. Also avoids allocating a new subnet:
+    # this host's default address pools are exhausted.
+    network_mode: bridge
+    environment:
+      - PUID=99
+      - PGID=100
+      - TZ=Europe/Berlin
+    ports:
+      - "6363:80"
+    # /var/www/html/cache is an image VOLUME; it only holds fetched-page cache,
+    # so it stays an anonymous volume.

@@ -23,9 +23,15 @@ if (source.includes(marker)) {
   process.exit(0);
 }
 
-const functionAnchor = "function validateBashArgs(args) {";
-const executeAnchor = "\t\tasync execute(args, exec) {\n\t\t\tvalidateBashArgs(args);";
-if (!source.includes(functionAnchor) || !source.includes(executeAnchor)) {
+const functionAnchor = [
+  "function validateBashArgs(args, effectiveMode) {",
+  "function validateBashArgs(args) {",
+].find((candidate) => source.includes(candidate));
+const validateAnchor = [
+  "\t\t\tvalidateBashArgs(args, standingPolicy?.mode);",
+  "\t\t\tvalidateBashArgs(args);",
+].find((candidate) => source.includes(candidate));
+if (!functionAnchor || !validateAnchor) {
   throw new Error(`patch ${marker}: pattern not found in ${file}`);
 }
 
@@ -43,8 +49,8 @@ function rejectHarnessTermination(command) {
 
 source = source.replace(functionAnchor, `${guard}\n${functionAnchor}`);
 source = source.replace(
-  executeAnchor,
-  `${executeAnchor}\n\t\t\trejectHarnessTermination(args.command);`,
+  validateAnchor,
+  `${validateAnchor}\n\t\t\trejectHarnessTermination(args.command);`,
 );
 writeFileSync(file, source);
 console.log(`patched ${marker} in ${file}`);

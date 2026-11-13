@@ -1,0 +1,111 @@
+# Browser automation stack: headless Chromium + browser-use CLI + Bitwarden Agent Access (aac).
+#
+# chrome  - headed Chromium on Xvfb, CDP on 127.0.0.1:9222 inside the shared netns,
+#           noVNC on 10.0.0.24:6080 for captchas and 2FA
+# agent   - browser-use + aac; shares chrome's network namespace so CDP is reached via
+#           localhost (Chrome rejects CDP requests whose Host header is a hostname)
+#
+# Usage: see README.md
+services:
+  # NetBird peer that owns the stack's network namespace. Chrome and the agent join it, so the
+  # browser reaches *.netbird.hjacke.com from a mesh IP (Caddy only allows 100.113.0.0/16).
+  # npm_services is needed to reach the management server through Traefik (172.25.0.254).
+  netbird:
+    image: netbirdio/netbird:latest
+    container_name: browser-agent-netbird
+    hostname: browser-agent
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+    devices:
+      - /dev/net/tun
+    extra_hosts:
+      - "netbird.hjacke.com:172.25.0.254"
+    environment:
+      NB_SETUP_KEY: ${NB_SETUP_KEY:?set NB_SETUP_KEY in .env}
+      NB_MANAGEMENT_URL: https://netbird.hjacke.com/
+      NB_DISABLE_DNS: "true"
+    # noVNC is published here because chrome shares this container's network namespace
+    ports:
+      - "10.0.0.24:6080:6080"
+    volumes:
+      - /mnt/user/appdata/browser-agent/netbird:/var/lib/netbird
+    networks:
+      - default
+      - npm_services
+
+  chrome:
+    build:
+      context: .
+      dockerfile: Dockerfile.chrome
+      args:
+        BROWSER_USE_TAG: ${BROWSER_USE_TAG:-main}
+    image: local/browser-agent-chrome:latest
+    pull_policy: build
+    container_name: browser-agent-chrome
+    restart: unless-stopped
+    network_mode: "service:netbird"
+    depends_on:
+      - netbird
+    # chrome-entrypoint.sh starts Xvfb + noVNC, clears stale profile locks, then runs Chromium
+    # headed with these flags. noVNC (watch / take over the browser): http://10.0.0.24:6080/vnc.html
+    environment:
+      VNC_PASSWORD: ${VNC_PASSWORD:?set VNC_PASSWORD in .env}
+    command:
+      - --no-sandbox
+      - --disable-dev-shm-usage
+      - --disable-gpu
+      - --remote-debugging-address=127.0.0.1
+      - --remote-debugging-port=9222
+      - --user-data-dir=/data/profile
+      - --no-first-run
+      - --no-default-browser-check
+      - --window-size=1440,900
+      - --disable-blink-features=AutomationControlled
+      - --lang=en-US
+      - about:blank
+    shm_size: 1gb
+    volumes:
+      - /mnt/user/appdata/browser-agent/chrome:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9222/json/version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+
+  agent:
+    build:
+      context: .
+      args:
+        BROWSER_USE_TAG: ${BROWSER_USE_TAG:-main}
+        AAC_VERSION: ${AAC_VERSION:-v0.11.0}
+    image: local/browser-agent:latest
+    pull_policy: build
+    container_name: browser-agent
+    restart: unless-stopped
+    network_mode: "service:netbird"
+    depends_on:
+      chrome:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # browser-use (browser-harness) attaches to this CDP endpoint instead of spawning Chrome
+      BU_CDP_URL: http://127.0.0.1:9222
+      ANONYMIZED_TELEMETRY: "false"
+    volumes:
+      # aac identity, PSKs and cached connections (~/.access-protocol)
+      - /mnt/user/appdata/browser-agent/aac:/home/browseruse/.access-protocol
+      - /mnt/user/appdata/browser-agent/workspace:/workspace
+
+networks:
+  npm_services:
+    external: true

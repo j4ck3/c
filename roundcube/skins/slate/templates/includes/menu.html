@@ -1,0 +1,57 @@
+<roundcube:add_label name="inbox" />
+<roundcube:add_label name="junk" />
+<!-- Slate: the task menu is hidden on desktop (the folder sidebar carries navigation).
+     On phones it becomes a bottom navigation bar: Inbox, Junk, Settings. -->
+<div id="layout-menu">
+	<h2 id="aria-label-tasknav" class="voice"><roundcube:label name="arialabeltasknav" /></h2>
+	<div class="popover-header">
+		<roundcube:object name="logo" src="/images/logo.svg" id="logo" alt="Logo" />
+		<a class="button icon cancel"><span class="inner"><roundcube:label name="close" /></span></a>
+	</div>
+	<div id="taskmenu" class="menu toolbar" role="navigation" aria-labelledby="aria-label-tasknav">
+		<span class="action-buttons">
+			<roundcube:if condition="env:action == 'compose' and env:task == 'mail'" />
+				<roundcube:button command="compose" type="link" class="compose selected"
+					label="compose" title="writenewmessage" innerclass="inner" />
+			<roundcube:else />
+				<roundcube:button command="compose" type="link" class="compose"
+					label="compose" title="writenewmessage" innerclass="inner"
+					data-fab="true" data-fab-task="mail" data-fab-action="none" />
+			<roundcube:endif />
+		</span>
+		<roundcube:if condition="env:action == 'compose' and env:task == 'mail'" />
+			<roundcube:button command="mail" label="mail" type="link" innerClass="inner"
+				class="mail" />
+		<roundcube:else />
+			<roundcube:button command="mail" label="mail" type="link" innerClass="inner"
+				class="mail" classSel="mail selected" />
+		<roundcube:endif />
+		<roundcube:button command="addressbook" label="contacts" type="link" innerClass="inner"
+			class="contacts" classSel="contacts selected" />
+		<roundcube:container name="taskbar" id="taskmenu" />
+		<roundcube:button command="settings" label="settings" type="link" innerClass="inner"
+			class="settings" classSel="settings selected" />
+		<span class="special-buttons">
+			<roundcube:button name="about" label="about" type="link"
+				class="about" innerClass="inner" onclick="UI.about_dialog(this)" />
+			<roundcube:button command="logout" label="logout" type="link"
+				class="logout" innerClass="inner" />
+		</span>
+	</div>
+</div>
+
+<roundcube:if condition="!env:framed && !env:extwin" />
+<nav id="slate-bottomnav" aria-label="<roundcube:label name="arialabeltasknav" />">
+	<a href="./?_task=mail&amp;_mbox=INBOX" class="slate-tab tab-inbox" data-mbox="INBOX">
+		<span class="slate-tab-icon"></span><span class="slate-tab-label"><roundcube:label name="inbox" /></span>
+		<span class="slate-tab-badge"></span>
+	</a>
+	<a href="./?_task=mail&amp;_mbox=Junk" class="slate-tab tab-junk" data-mbox="junk">
+		<span class="slate-tab-icon"></span><span class="slate-tab-label"><roundcube:label name="junk" /></span>
+		<span class="slate-tab-badge"></span>
+	</a>
+	<a href="./?_task=settings" class="slate-tab tab-settings" data-task="settings">
+		<span class="slate-tab-icon"></span><span class="slate-tab-label"><roundcube:label name="settings" /></span>
+	</a>
+</nav>
+<roundcube:endif />

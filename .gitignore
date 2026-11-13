@@ -19,7 +19,6 @@ opencode-config/
 opencode-cache/
 opencode-data/
 
-komodo/app/
 
 codeberg-runner/secrets/
 codeberg-runner/.env

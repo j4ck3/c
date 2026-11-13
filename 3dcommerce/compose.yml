@@ -1,0 +1,73 @@
+# 3dcommerce dev stack: Next.js dev server + Postgres.
+# Source: /mnt/user/documents/work/3dcommerce (git@github.com:j4ck3/3dcommerce.git).
+#
+# Ported from two hand-run containers (3dcommerce-app, 3dcommerce_postgres).
+# Do not use the repo's own docker-compose.yml for this: its command runs
+# `prisma db seed`, and prisma/seed.mjs deletes all orders, users and coupons.
+#
+# Secrets live in the repo's .env. ./.env is a symlink to it so compose can
+# interpolate POSTGRES_* below. After a fresh clone of this compose repo:
+#   ln -s /mnt/user/documents/work/3dcommerce/.env .env
+#
+# Postgres also serves the 3dcommerce_letterset database for
+# work/3dcommerce-letterset, which connects through 10.0.0.24:5432.
+name: 3dcommerce
+
+services:
+  app:
+    image: 3dcommerce-dev:local
+    build:
+      context: /mnt/user/documents/work/3dcommerce
+      dockerfile: Dockerfile.dev
+    container_name: 3dcommerce-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3331:3331"
+    env_file:
+      - /mnt/user/documents/work/3dcommerce/.env
+    environment:
+      # The repo .env points at 10.0.0.24:5432 for running outside Docker;
+      # inside the stack the app talks to the postgres container directly.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@3dcommerce_postgres:5432/${POSTGRES_DB}?schema=public
+      DIRECT_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@3dcommerce_postgres:5432/${POSTGRES_DB}?schema=public
+      NEXT_PUBLIC_SERVER_URL: http://10.0.0.24:3331
+      NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET_1: tx5ufc4r
+      NODE_ENV: development
+      HOSTNAME: 0.0.0.0
+      PORT: "3331"
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    command: ["sh", "-c", "bun run dev -- -H 0.0.0.0 -p 3331"]
+    volumes:
+      - /mnt/user/documents/work/3dcommerce:/app
+      - app_node_modules:/app/node_modules
+      - app_next:/app/.next
+
+  postgres:
+    image: postgres:17
+    container_name: 3dcommerce_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in the repo .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the repo .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in the repo .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+    name: 3dcommerce_postgres_data
+  app_node_modules:
+    name: 3dcommerce_app_node_modules
+  app_next:
+    name: 3dcommerce_app_next

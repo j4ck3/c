@@ -7,7 +7,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /mnt/user/appdata/dockhand/data:/app/data
     networks:
-      - npm_services
+      npm_services:
+        mac_address: "02:d0:cc:00:00:01"
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=npm_services"

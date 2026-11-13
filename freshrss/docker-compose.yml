@@ -11,6 +11,7 @@ services:
       - PGID=100
       - UMASK=022
       - TZ=Europe/Stockholm
+      - INTERNAL_HOST_ALLOWLIST=news:80 news.hjacke.com:80 172.25.0.31:80
     networks:
       - npm_services
     labels:

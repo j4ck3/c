@@ -109,13 +109,10 @@ services:
     volumes:
       - /mnt/user/downloads/soulseek:/downloads
       - /mnt/user/downloads/soulseek/incomplete:/incomplete
-      - /mnt/user/music:/music:rw
-      - /mnt/user/media/Youtube:/youtube-paywall:rw
+      - /mnt/cache/media/Youtube:/youtube-paywall:rw
       - /mnt/user/podcasts:/podcasts:rw
-      - /mnt/user/syncthing/qqq:/nsfw:rw
       - /mnt/user/appdata/nicotineplus-proper/config:/config
       - /mnt/user/appdata/nicotineplus-proper/data:/data
-      - /mnt/user/syncthing/apps:/apps:rw
     restart: unless-stopped
 
   qui:

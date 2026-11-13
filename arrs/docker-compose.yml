@@ -9,7 +9,7 @@ services:
       - TZ=Etc/UTC
     volumes:
       - /mnt/user/appdata/sonarr/config:/config
-      - /mnt/user/media/TV:/tv
+      - /mnt/cache/media/TV:/tv
       - /mnt/user/downloads/qbitorrent:/downloads
     networks:
       - npm_services
@@ -35,7 +35,7 @@ services:
       - TZ=Etc/UTC
     volumes:
       - /mnt/user/appdata/binhex-radarr:/config
-      - /mnt/user/media/Movies:/movies
+      - /mnt/cache/media/Movies:/movies
       - /mnt/user/downloads/qbitorrent:/downloads
     networks:
       - npm_services
@@ -61,7 +61,7 @@ services:
       - TZ=Etc/UTC
     volumes:
       - /mnt/user/appdata/bazarr/config:/config
-      - /mnt/user/media:/media
+      - /mnt/cache/media:/media
     networks:
       - npm_services
     labels:
@@ -76,6 +76,45 @@ services:
       - "traefik.http.services.bazarr.loadbalancer.server.port=6767"
     restart: unless-stopped
 
+  # lidarr and prowlarr: ported from Unraid dockerMan templates (my-lidarr.xml,
+  # my-prowlarr.xml). Prowlarr syncs indexers to sonarr/radarr/lidarr by
+  # container name on npm_services. Lidarr reaches qBittorrent at 10.0.0.24:8080.
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    hostname: lidarr
+    environment:
+      - PUID=99
+      - PGID=100
+      - UMASK=022
+      - TZ=Europe/Berlin
+    ports:
+      - "8686:8686"
+    volumes:
+      - /mnt/user/appdata/lidarr:/config
+      - /mnt/user/music:/music
+      - /mnt/user/downloads:/downloads
+    networks:
+      - npm_services
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    hostname: prowlarr
+    environment:
+      - PUID=99
+      - PGID=100
+      - UMASK=022
+      - TZ=Europe/Berlin
+    ports:
+      - "9696:9696"
+    volumes:
+      - /mnt/user/appdata/prowlarr:/config
+    networks:
+      - npm_services
+    restart: unless-stopped
+
   seerr:
     image: ghcr.io/seerr-team/seerr:latest
     init: true
@@ -88,7 +127,7 @@ services:
       - "5055:5055"
     volumes:
       - /mnt/user/appdata/overseerr:/app/config
-      - /mnt/user/media:/media
+      - /mnt/cache/media:/media
     environment:
       - TZ=Etc/UTC
       - PORT=5055

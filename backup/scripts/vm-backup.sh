@@ -29,7 +29,7 @@ set +e
 # =============================================================================
 VM_NAME="${VM_NAME:-Windows 10 Enterprise IoT LTSC_v2}"
 VM_DISK="/mnt/user/domains/Windows 10 Enterprise IoT LTSC_v2/vdisk1.img"
-RESTIC_REPO="${RESTIC_REPO:-/mnt/user/backups/restic}"
+RESTIC_REPO="${RESTIC_REPO:-/mnt/cache/backups/restic}"
 SHUTDOWN_TIMEOUT=300  # 5 minutes to wait for graceful shutdown
 STARTUP_WAIT=60       # Wait 60 seconds after starting VM
 

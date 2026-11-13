@@ -1,0 +1,85 @@
+# Firefly III + Data Importer, routed through the shared Traefik (10.0.0.25).
+# firefly.hjacke.com and importer.hjacke.com resolve to 10.0.0.25 (LAN only).
+# Both routers are restricted to LAN and NetBird source addresses.
+services:
+  app:
+    image: fireflyiii/core:latest
+    hostname: app
+    container_name: firefly_iii_core
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /mnt/cache/appdata/firefly/upload:/var/www/html/storage/upload
+    networks:
+      - firefly_iii
+      - npm_services
+    depends_on:
+      - db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=npm_services"
+      - "traefik.http.middlewares.firefly-lan.ipallowlist.sourcerange=10.0.0.0/24,100.64.0.0/10"
+      - "traefik.http.routers.firefly.rule=Host(`firefly.hjacke.com`)"
+      - "traefik.http.routers.firefly.entrypoints=websecure"
+      - "traefik.http.routers.firefly.tls=true"
+      - "traefik.http.routers.firefly.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.firefly.middlewares=firefly-lan"
+      - "traefik.http.routers.firefly.service=firefly"
+      - "traefik.http.services.firefly.loadbalancer.server.port=8080"
+
+  db:
+    image: mariadb:lts
+    hostname: db
+    container_name: firefly_iii_db
+    restart: unless-stopped
+    env_file: .db.env
+    volumes:
+      - /mnt/cache/appdata/firefly/db:/var/lib/mysql
+    networks:
+      - firefly_iii
+
+  importer:
+    image: fireflyiii/data-importer:latest
+    hostname: importer
+    container_name: firefly_iii_importer
+    restart: unless-stopped
+    env_file: .importer.env
+    volumes:
+      - /mnt/cache/appdata/firefly/importer-config:/import
+    networks:
+      - firefly_iii
+      - npm_services
+    depends_on:
+      - app
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=npm_services"
+      - "traefik.http.routers.firefly-importer.rule=Host(`importer.hjacke.com`)"
+      - "traefik.http.routers.firefly-importer.entrypoints=websecure"
+      - "traefik.http.routers.firefly-importer.tls=true"
+      - "traefik.http.routers.firefly-importer.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.firefly-importer.middlewares=firefly-lan"
+      - "traefik.http.routers.firefly-importer.service=firefly-importer"
+      - "traefik.http.services.firefly-importer.loadbalancer.server.port=8080"
+
+  cron:
+    # Firefly's daily maintenance (recurring transactions, bills, exchange rates).
+    image: alpine
+    container_name: firefly_iii_cron
+    restart: unless-stopped
+    env_file: .env
+    command: ["sh", "-c", "apk add tzdata && \
+      (ln -s /usr/share/zoneinfo/$$TZ /etc/localtime || true) && \
+      echo \"0 3 * * * wget -qO- http://app:8080/api/v1/cron/$$STATIC_CRON_TOKEN;echo\" \
+      | crontab - && \
+      crond -f -L /dev/stdout"]
+    networks:
+      - firefly_iii
+    depends_on:
+      - app
+
+networks:
+  firefly_iii:
+    driver: bridge
+  npm_services:
+    external: true

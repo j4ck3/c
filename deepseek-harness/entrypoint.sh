@@ -70,7 +70,6 @@ BUNDLED_SKILLS="${DSH_BUNDLED_SKILLS:-/opt/dsh/skills}"
 REMOTE_VSCODE_INSTALLER="${DSH_REMOTE_VSCODE_INSTALLER:-/opt/dsh/scripts/install-remote-vscode-cli.sh}"
 REMOTE_VSCODE_HOSTS="${DSH_REMOTE_VSCODE_HOSTS:-tower}"
 REMOTE_SSH_PROXY_JUMPS="${DSH_REMOTE_SSH_PROXY_JUMPS:-}"
-REMOTE_SSH_CODE_COMMANDS="${DSH_REMOTE_SSH_CODE_COMMANDS:-10.0.0.165=/home/jacke/.dsh-remote-ssh/cli/bin/code}"
 
 mkdir -p "${DSH_HOME}" "${AGENTS_SKILLS}" "${VENDOR_DIR}"
 
@@ -114,51 +113,15 @@ if [ -n "${REMOTE_SSH_PROXY_JUMPS}" ] && [ -f "${ssh_config}" ]; then
   done
 fi
 
-# Some systems install an unrelated `code` wrapper first in PATH. Pin the
-# official CLI for those saved Remote SSH servers before DSH reads settings.
-settings_yaml="${DSH_HOME}/settings.yaml"
-if [ -n "${REMOTE_SSH_CODE_COMMANDS}" ] && [ -f "${settings_yaml}" ]; then
-  read -r -a remote_ssh_code_commands <<< "${REMOTE_SSH_CODE_COMMANDS}"
-  for route in "${remote_ssh_code_commands[@]}"; do
-    target="${route%%=*}"
-    code_command="${route#*=}"
-    if [ -z "${target}" ] || [ -z "${code_command}" ]; then
-      echo "deepseek-harness: warning: invalid Remote SSH code command '${route}'" >&2
-      continue
-    fi
-    python3 - "${settings_yaml}" "${target}" "${code_command}" <<'PY'
-from pathlib import Path
-import re
-import sys
-
-path = Path(sys.argv[1])
-target = sys.argv[2]
-command = sys.argv[3]
-text = path.read_text()
-pattern = re.compile(
-    r"(?ms)^(?P<indent>\s*)- id: (?P<id>[^\n]+)\n"
-    r"(?P<body>(?:(?!^\s*- id: |^\S).)*?^\s*sshTarget: " + re.escape(target) + r"\n)"
-    r"(?P<tail>(?:(?!^\s*- id: |^\S).)*)"
-)
-match = pattern.search(text)
-if match is None:
-    raise SystemExit(0)
-block = match.group(0)
-line = f"      remoteCodeCommand: {command}\n"
-if re.search(r"(?m)^\s*remoteCodeCommand:", block):
-    updated = re.sub(r"(?m)^\s*remoteCodeCommand:.*\n", line, block, count=1)
-else:
-    updated = block + line
-if updated != block:
-    path.write_text(text[:match.start()] + updated + text[match.end():])
-PY
-  done
-fi
+# The Remote SSH bundle prefers its private official CLI. Do not rewrite
+# settings.yaml at boot: server rows can be added dynamically, and a previous
+# text-based injection placed remoteCodeCommand under workspaces, breaking all
+# settings (including the user's model catalog).
 
 # dsh-remote-ssh needs the official VS Code CLI on each target. Unraid rebuilds
 # /root in RAM on every boot, so the installer also restores its link to the
 # persistent cache-pool copy before DSH accepts any requests.
-if [ -x "${REMOTE_VSCODE_INSTALLER}" ] && [ -n "${REMOTE_VSCODE_HOSTS}" ]; then
+if [ -x "${REMOTE_VSCODE_INSTALLER}" ] && [ -n "${REMOTE_VSCODE_HOSTS}" ] && grep -q '"dsh-remote-ssh"' "${DSH_HOME}/profiles/web/package.json" 2>/dev/null; then
   read -r -a remote_vscode_hosts <<< "${REMOTE_VSCODE_HOSTS}"
   echo "deepseek-harness: ensuring VS Code Agent Host on ${remote_vscode_hosts[*]}"
   if ! "${REMOTE_VSCODE_INSTALLER}" "${remote_vscode_hosts[@]}"; then
@@ -166,15 +129,8 @@ if [ -x "${REMOTE_VSCODE_INSTALLER}" ] && [ -n "${REMOTE_VSCODE_HOSTS}" ]; then
   fi
 fi
 
-# Pin new sessions to full access. workspace-write fail-closes on this host
-# (Landlock disabled, bwrap: Operation not permitted) and then the model
-# loops on danger-full-access approval prompts. Existing sessions keep their
-# logged preset until a new chat is started.
-settings_yaml="${DSH_HOME}/settings.yaml"
-if [ ! -f "${settings_yaml}" ] || ! grep -q '^permission:' "${settings_yaml}"; then
-  printf '\npermission:\n  defaultPreset: danger-full-access\n' >> "${settings_yaml}"
-  echo "deepseek-harness: set permission.defaultPreset=danger-full-access"
-fi
+# Harness 0.1.7 stores settings in the active profile. Never recreate
+# settings.yaml: the one-time migration renamed it to settings.yaml.imported.
 
 # DSH 0.1.2 moved trusted-host authorization into the built-in Connection
 # service. The old workaround imports dsh-host-apiproxy, which 0.1.2 removed,
@@ -185,93 +141,78 @@ if grep -q 'dsh-trusted-host-proxy-403-fix' "${profile_pkg}" 2>/dev/null; then
   dsh plugin --profile web remove dsh-trusted-host-proxy-403-fix
 fi
 
-# Transparent SSH workspaces (Settings → Remote SSH). Needs OpenSSH already working.
-if ! grep -q '"dsh-remote-ssh"' "${profile_pkg}" 2>/dev/null; then
-  echo "deepseek-harness: installing dsh-remote-ssh"
-  dsh plugin --profile web add dsh-remote-ssh
-fi
-
-# In-process OpenViking memory: automatic per-step recall, durable capture,
-# an MCP tool bridge, and the openviking-memory skill. The profile lives on a
-# persistent volume, but this guard also restores it after profile resets.
-if ! grep -q '@openviking/dsh-memory-plugin' "${profile_pkg}" 2>/dev/null; then
-  echo "deepseek-harness: installing OpenViking memory bundle"
-  dsh plugin --profile web add @openviking/dsh-memory-plugin
-fi
-
-# ChatGPT OAuth provider for Codex models. Pin the source commit because the
-# repository's current 0.1.6 code has not yet been published as a release.
-# The profile is persistent, while this guard restores the plugin after a
-# profile reset without relying on a moving GitHub branch.
-CODEX_OAUTH_REF="${DSH_CODEX_OAUTH_REF:-362738416bccddcb7a882ccf4c98f2ac2959e61f}"
-CODEX_OAUTH_PREPARE="${DSH_CODEX_OAUTH_PREPARE:-/opt/dsh/patches/prepare-dsh-codex-oauth.mjs}"
-if [ -f "${CODEX_OAUTH_PREPARE}" ]; then
-  node "${CODEX_OAUTH_PREPARE}"
-fi
-if ! grep -q '"dsh-codex-oauth"' "${profile_pkg}" 2>/dev/null; then
-  echo "deepseek-harness: installing Codex OAuth bundle at ${CODEX_OAUTH_REF}"
-  dsh plugin --profile web add "github:birat-chapagain/dsh-codex-oauth#${CODEX_OAUTH_REF}"
-fi
-
-# Current DSH renamed the plugin's CallId runtime brand to ToolCallId. Reapply
-# after every package install/update until upstream ships DSH 0.1.2 support.
-CODEX_OAUTH_PATCH="${DSH_CODEX_OAUTH_PATCH:-/opt/dsh/patches/patch-dsh-codex-oauth.mjs}"
-if [ -f "${CODEX_OAUTH_PATCH}" ]; then
-  node "${CODEX_OAUTH_PATCH}"
-fi
-
-install_plugin_ahp_090() {
-  local remote_ssh_pkg="$1"
-  local nest="${remote_ssh_pkg}/node_modules/@microsoft/agent-host-protocol"
-  local ver
-  ver="$(ahp_ver "${nest}")"
-  if [ "${ver}" = "0.9.0" ]; then
-    return 0
-  fi
-  echo "deepseek-harness: installing plugin AHP client 0.9.0 via npm pack (was ${ver:-none})"
-  local tmp
-  tmp="$(mktemp -d)"
-  if ! npm pack @microsoft/agent-host-protocol@0.9.0 --pack-destination "${tmp}" >/dev/null 2>&1 \
-    || ! tar -xzf "${tmp}/microsoft-agent-host-protocol-0.9.0.tgz" -C "${tmp}"; then
-    rm -rf "${tmp}"
-    echo "deepseek-harness: warning: failed to install plugin AHP client 0.9.0" >&2
-    return 1
-  fi
-  mkdir -p "$(dirname "${nest}")"
-  rm -rf "${nest}"
-  mv "${tmp}/package" "${nest}"
-  rm -rf "${tmp}"
+profile_plugin_version() {
+  local package="$1" manifest="${DSH_HOME}/profiles/web/node_modules/${1}/package.json"
+  [ -f "${manifest}" ] \
+    && node -p "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).version" "${manifest}" 2>/dev/null \
+    || true
 }
 
-# Stable VS Code Agent Host requires AHP ^0.9.0. dsh-remote-ssh@0.2.4 still
-# resolves @microsoft/agent-host-protocol@0.7 which cannot negotiate. Never
-# `pnpm add` at the profile root — that rewires the web profile and returns HTTP 400.
-profile_web="${DSH_HOME}/profiles/web"
-remote_ssh_pkg="${profile_web}/node_modules/dsh-remote-ssh"
-ahp_ver() {
-  local pkg="$1/package.json"
-  [ -f "$pkg" ] && node -p "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).version" "$pkg" 2>/dev/null || true
+ensure_profile_plugin() {
+  local package="$1" version="$2" installed
+  installed="$(profile_plugin_version "${package}")"
+  if [ "${installed}" = "${version}" ]; then
+    return
+  fi
+  echo "deepseek-harness: installing ${package}@${version} (was ${installed:-missing})"
+  dsh plugin --profile web add "${package}@${version}" \
+    || echo "deepseek-harness: warning: ${package}@${version} install failed; keeping ${installed:-absent}" >&2
 }
-if [ -d "${remote_ssh_pkg}" ]; then
-  install_plugin_ahp_090 "${remote_ssh_pkg}" || true
+
+# dsh-remote-ssh@0.2.4 uses the pre-0.1.7 settings interface and disables
+# the stock filesystem/shell routes. Keep its local checkout and saved remote
+# mappings for future migration, but do not install it on Harness 0.1.7.
+
+# dsh-better-sidebar is optional for the fork's remote-workspace, SSH tool,
+# and terminal features. Keep its checkout for a later Files-tab deployment,
+# but do not reinstall the inactive sidebar bundle at boot.
+
+# Keep registry-backed profile plugins on reviewed versions. Disable plugins
+# that fail composition with this Harness release rather than forcing them.
+# Local/link plugins remain deployment-owned.
+# Task board 0.3.24 requires the removed settingsScope service on 0.1.7;
+# keep ~/.dsh/task-board data, but do not install the incompatible plugin.
+ensure_profile_plugin "@liustack/modsearch" "5.10.10"
+ensure_profile_plugin "@openviking/dsh-memory-plugin" "0.5.28"
+ensure_profile_plugin "dsh-context" "0.74.0"
+ensure_profile_plugin "dshmarket" "1.69.0"
+ensure_profile_plugin "@canary-builds/dsh-mobile-ui" "1.1.2"
+# This fork declares compatibility with the Harness 0.2.1 release line.
+# The former dsh-remote-ssh@0.2.4 must remain disabled.
+ensure_profile_plugin "@zhangfengshun/dsh-remote-ssh" "2.4.36"
+
+# Subscription OAuth providers (ChatGPT/Codex, Claude, Grok, Copilot,
+# Antigravity) via dsh-plugin-subscriptions. Supersedes the old
+# birat-chapagain/dsh-codex-oauth bundle, which only covered Codex.
+# Credentials do not migrate: re-authorize under Settings -> Subscriptions.
+# 0.9.12 is the first release whose peer ranges admit Harness 0.2.1-rc.5.
+ensure_profile_plugin "dsh-plugin-subscriptions" "0.9.12"
+
+# Migrate away from the retired dsh-codex-oauth plugin.
+if grep -q dsh-codex-oauth "${profile_pkg}" 2>/dev/null; then
+  echo "deepseek-harness: removing obsolete dsh-codex-oauth plugin"
+  dsh plugin --profile web remove dsh-codex-oauth \
+    || echo "deepseek-harness: warning: dsh-codex-oauth removal failed" >&2
 fi
 
-# 0.2.4 targets the older DSH package surface. Patch every boot so a plugin
-# reinstall cannot bring back its settings import, keyed-slot, trusted-request,
-# ripgrep, or AHP compatibility issues.
-REMOTE_SSH_PATCH="${DSH_REMOTE_SSH_PATCH:-/opt/dsh/patches/patch-dsh-remote-ssh.mjs}"
-if [ -f "${REMOTE_SSH_PATCH}" ]; then
-  node "${REMOTE_SSH_PATCH}"
+# Local patch: sanitize Anthropic tool_use/tool_result ids; DSH history from
+# other providers can carry characters outside ^[a-zA-Z0-9_-]+$ which the
+# Claude API rejects with HTTP 400. Idempotent.
+SUBS_ID_PATCH="/opt/dsh/patches/patch-subscriptions-tool-ids.mjs"
+if [ -f "${SUBS_ID_PATCH}" ]; then
+  node "${SUBS_ID_PATCH}"
 fi
 
-# dsh-better-sidebar launches `git` with node:child_process, so Remote SSH
-# workspace aliases are accidentally evaluated inside this container. Route
-# Git through DSH's cwd-aware subprocess service instead. Reapply every boot
-# because `dsh plugin add/update` can replace the installed bundle.
-BETTER_SIDEBAR_PATCH="${DSH_BETTER_SIDEBAR_PATCH:-/opt/dsh/patches/patch-dsh-better-sidebar.mjs}"
-if [ -f "${BETTER_SIDEBAR_PATCH}" ]; then
-  node "${BETTER_SIDEBAR_PATCH}"
-fi
+# A remote workspace must route ordinary tools, not merely offer optional SSH
+# tools. Fail startup if the reviewed routing patch cannot be installed.
+node "${PATCHES_DIR}/migrate-legacy-ssh-workspaces.mjs"
+node "${PATCHES_DIR}/patch-remote-workspace-guard.mjs"
+
+# Saved model choices now live in the profile patch (migrated by Harness).
+# Do not append model rows to the retired settings.yaml file.
+
+# The old VS Code Agent Host plugin and its sidebar patch remain disabled.
+# The replacement uses OpenSSH directly and needs no VS Code Server.
 
 # Sparse clone: only the skills/ tree. Repos are large (especially caveman).
 sync_repo() {
@@ -339,6 +280,52 @@ if [ -f "${PATCHES_DIR}/openviking.cordis.yml" ]; then
   echo "deepseek-harness: OpenViking memory overlay ${PATCHES_DIR}/openviking.cordis.yml"
 fi
 
+# DSH provider routes in this profile target Headroom on loopback. Start and
+# supervise it in this container; without this process model requests fail as
+# Connection errors before reaching OpenRouter or DeepSeek.
+HEADROOM_STARTER="${DSH_HEADROOM_STARTER:-${HOME}/.headroom/start-dsh-proxy.sh}"
+headroom_pid=""
+if [ -x "${HEADROOM_STARTER}" ]; then
+  if ! curl -fsS --max-time 1 http://127.0.0.1:8788/readyz >/dev/null 2>&1; then
+    echo "deepseek-harness: starting Headroom provider proxy on 127.0.0.1:8788"
+    "${HEADROOM_STARTER}" &
+    headroom_pid=$!
+    for _ in $(seq 1 60); do
+      if curl -fsS --max-time 1 http://127.0.0.1:8788/readyz >/dev/null 2>&1; then
+        break
+      fi
+      if ! kill -0 "${headroom_pid}" 2>/dev/null; then
+        echo "deepseek-harness: Headroom proxy exited before becoming ready" >&2
+        wait "${headroom_pid}" || true
+        exit 1
+      fi
+      sleep 1
+    done
+    if ! curl -fsS --max-time 1 http://127.0.0.1:8788/readyz >/dev/null 2>&1; then
+      echo "deepseek-harness: Headroom proxy did not become ready" >&2
+      exit 1
+    fi
+  else
+    echo "deepseek-harness: Headroom provider proxy already ready"
+  fi
+else
+  echo "deepseek-harness: warning: Headroom proxy launcher missing at ${HEADROOM_STARTER}" >&2
+fi
+
+# Invalid settings must fail startup visibly, not silently hide saved models.
+if [ -f "${DSH_HOME}/settings.yaml" ]; then
+  node - "${DSH_HOME}/settings.yaml" <<'JS'
+const fs = require('node:fs');
+const { createRequire } = require('node:module');
+const yaml = createRequire('/usr/local/lib/node_modules/@deepseek-ai/dsh/package.json')('yaml');
+const document = yaml.parseDocument(fs.readFileSync(process.argv[2], 'utf8'));
+if (document.errors.length) {
+  console.error('deepseek-harness: invalid settings.yaml:', document.errors.map(error => `${error.code} at line ${error.linePos?.[0]?.line ?? '?'}`).join(', '));
+  process.exit(1);
+}
+JS
+fi
+
 echo "deepseek-harness: starting dsh on 127.0.0.1:${DSH_PORT}"
 echo "deepseek-harness: trusted host ${TRUSTED_HOST}"
 echo "deepseek-harness: proxying 0.0.0.0:${PROXY_PORT} -> 127.0.0.1:${DSH_PORT}"
@@ -359,8 +346,14 @@ dsh_pid=$!
 cleanup() {
   kill "${dsh_pid}" 2>/dev/null || true
   kill "${proxy_pid:-}" 2>/dev/null || true
+  if [ -n "${headroom_pid}" ]; then
+    # start-dsh-proxy.sh spawns the proxy and stats bridge as direct children.
+    pkill -TERM -P "${headroom_pid}" 2>/dev/null || true
+    kill "${headroom_pid}" 2>/dev/null || true
+  fi
   wait "${dsh_pid}" 2>/dev/null || true
   wait "${proxy_pid:-}" 2>/dev/null || true
+  wait "${headroom_pid:-}" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 

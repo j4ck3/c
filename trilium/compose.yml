@@ -29,8 +29,11 @@ services:
     volumes:
       - /mnt/user/trilium:/home/node/trilium-data
     networks:
-      - npm_services
-      - trilium-internal
+      npm_services:
+        # Pinned: Docker had given Trilium and gluetun_torrents the same MAC on
+        # npm_services, so the bridge flapped between their ports (502s).
+        mac_address: "02:7e:17:00:00:0f"
+      trilium-internal: {}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=npm_services"

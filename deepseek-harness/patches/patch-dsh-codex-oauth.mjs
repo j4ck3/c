@@ -66,8 +66,12 @@ if (src.includes(imageCallFrom)) {
   if (!src.includes(imageImport)) src = `${imageImport}\n${src}`;
   src = src.replace(imageCallFrom, imageCallTo);
   changed = true;
-} else if (!src.includes("requestImageDimensions(block.attachment.width")) {
-  throw new Error(`patch Codex image request dimensions: pattern not found in ${file}`);
+} else if (src.includes("requestImageDimensions(block.attachment.width")) {
+  // Dimensions patch already applied.
+} else {
+  // Newer dsh-codex-oauth builds refuse image blocks before conversion, so
+  // the dimension-clamping pattern is absent. Nothing to patch; tolerate.
+  console.log(`dsh-codex-oauth: image-dimension pattern absent; skipping (upstream may have changed)`);
 }
 
 if (changed) {

@@ -1,0 +1,17 @@
+# FlareSolverr. Ported from the Unraid dockerMan template (my-flaresolverr.xml).
+# Prowlarr's FlareSolverr proxy points at http://10.0.0.24:8191, so the host
+# port stays published.
+services:
+  flaresolverr:
+    image: flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    restart: unless-stopped
+    # Default bridge, as under dockerMan. Also avoids allocating a new subnet:
+    # this host's default address pools are exhausted.
+    network_mode: bridge
+    environment:
+      - LOG_LEVEL=info
+      - TZ=UTC
+    ports:
+      - "8191:8191"
+    # /config is an image VOLUME and stays empty in practice; left anonymous.

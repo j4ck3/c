@@ -1,0 +1,44 @@
+# Hjälmaren buoy map: static site behind the home Traefik (10.0.0.25) with basic auth.
+# The chart layer and chart-derived buoys are for private use only.
+services:
+  hjalmaren:
+    image: nginx:alpine
+    container_name: hjalmaren
+    restart: unless-stopped
+    volumes:
+      - ./site:/usr/share/nginx/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - npm_services
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=npm_services
+      - traefik.http.routers.hjalmaren.entrypoints=websecure
+      - traefik.http.routers.hjalmaren.rule=Host(`hjalmaren.hjacke.com`)
+      - traefik.http.routers.hjalmaren.tls=true
+      - traefik.http.routers.hjalmaren.tls.certresolver=letsencrypt
+      - traefik.http.routers.hjalmaren.middlewares=hjalmaren-auth,hjalmaren-noindex
+      - traefik.http.middlewares.hjalmaren-auth.basicauth.users=pappa:$$2y$$05$$4SMO3FF8kBBZkRlRyQnode5mZazckTkGdd7nZfS3LmObXCtoScCGy
+      - traefik.http.middlewares.hjalmaren-auth.basicauth.realm=Hjalmaren
+      - traefik.http.middlewares.hjalmaren-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow
+      - traefik.http.services.hjalmaren.loadbalancer.server.port=80
+
+  # Refreshes site/data/ufs.json from the public Ufs pages every 6 hours.
+  ufs-refresh:
+    image: python:3.12-slim
+    container_name: hjalmaren-ufs
+    restart: unless-stopped
+    volumes:
+      - ./ufs:/app:ro
+      - ./site/data:/data
+    networks:
+      - npm_services
+    command: >
+      sh -c "while true; do
+               python /app/fetch_ufs.py /data/ufs.json || echo 'Ufs fetch failed';
+               sleep 21600;
+             done"
+
+networks:
+  npm_services:
+    external: true

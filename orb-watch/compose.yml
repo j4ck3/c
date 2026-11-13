@@ -1,0 +1,30 @@
+services:
+  orb-watch:
+    image: python:3.12-alpine@sha256:6d43704baacd1bfbe7c295d7f13079d5d8104ed33568873133f8fc69980419df
+    container_name: orb-watch
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command: ["python3", "/app/orb_watch.py"]
+    env_file: .env
+    environment:
+      # POSIX rule: tower's zoneinfo has no Europe/Stockholm file.
+      TZ: CET-1CEST,M3.5.0,M10.5.0/3
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      STATE_DIR: /data
+    volumes:
+      - ./orb_watch.py:/app/orb_watch.py:ro
+      - /mnt/cache/appdata/orb-watch:/data
+    labels:
+      traefik.enable: "false"
+      com.centurylinklabs.watchtower.enable: "false"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

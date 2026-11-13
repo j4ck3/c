@@ -29,7 +29,7 @@ services:
       - /root/.ssh:/root/.ssh:ro
       - restic-cache:/root/.cache/restic
       # Host path so Promtail can read logs for Grafana backup monitoring
-      - /mnt/user/backups/logs:/var/log/backup
+      - /mnt/cache/backups/logs:/var/log/backup
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |

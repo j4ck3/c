@@ -1,0 +1,18 @@
+# Letter-set print worker on tower.
+#   SHOP_URL     the shop it serves (https://rjhdesign.se, or the dev instance)
+#   WORKER_TOKEN same value as WORKER_TOKEN in the shop's environment
+# Copy to /mnt/user/documents/compose/3dcommerce-worker/compose.yml with a .env next to it.
+services:
+  worker:
+    image: ${WORKER_IMAGE:-ghcr.io/j4ck3/3dcommerce-worker:latest}
+    container_name: ${WORKER_NAME:-3dcommerce-worker}
+    restart: unless-stopped
+    environment:
+      SHOP_URL: ${SHOP_URL:?set SHOP_URL}
+      WORKER_TOKEN: ${WORKER_TOKEN:?set WORKER_TOKEN}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-30000}
+    # SolidCraft uses every core it gets; keep room for the rest of tower.
+    cpus: 4
+    mem_limit: 4g
+    tmpfs:
+      - /tmp:size=1g,uid=1000

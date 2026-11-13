@@ -89,7 +89,7 @@ services:
     container_name: promtail
     volumes:
       - /mnt/user/appdata/promtail/config:/etc/promtail
-      - /mnt/user/backups/logs:/var/log/backups:ro
+      - /mnt/cache/backups/logs:/var/log/backups:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: -config.file=/etc/promtail/promtail-config.yaml

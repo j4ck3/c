@@ -6,11 +6,20 @@ tls:
         certFile: /etc/traefik/certs/rjhdesign_cloudflare_origin_cert.pem
         keyFile: /etc/traefik/certs/rjhdesign_cloudflare_origin_key.pem
   certificates:
+    # Exact-host LE cert (lego DNS-01) for the Hjälmaren buoy map; expires 90 days after issue.
+    - certFile: /etc/traefik/certs/hjalmaren.hjacke.com.pem
+      keyFile: /etc/traefik/certs/hjalmaren.hjacke.com-key.pem
     # Exact-host LE cert so m.hjacke.com is not served the untrusted Origin wildcard.
     - certFile: /etc/traefik/certs/m.hjacke.com.pem
       keyFile: /etc/traefik/certs/m.hjacke.com-key.pem
+    # Exact-host LE cert (lego DNS-01) for Firefly III + Data Importer; expires 90 days after issue.
+    - certFile: /etc/traefik/certs/firefly.hjacke.com.pem
+      keyFile: /etc/traefik/certs/firefly.hjacke.com-key.pem
     # Certificates that exist in /etc/traefik/certs. hjacke.com uses certresolver=letsencrypt in router labels.
     - certFile: /etc/traefik/certs/rjhdesign_cloudflare_origin_cert.pem
       keyFile: /etc/traefik/certs/rjhdesign_cloudflare_origin_key.pem
     - certFile: /etc/traefik/certs/cloudflare_origin_cert.pem
       keyFile: /etc/traefik/certs/cloudflare_origin_cert_private.pem
+    # news.hjacke.com (lego DNS-01, issued 2026-11-07)
+    - certFile: /etc/traefik/certs/certificates/news.hjacke.com.crt
+      keyFile: /etc/traefik/certs/certificates/news.hjacke.com.key

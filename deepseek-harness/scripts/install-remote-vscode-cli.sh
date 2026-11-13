@@ -10,9 +10,10 @@ if [ "$#" -eq 0 ]; then
   exit 1
 fi
 
+failed=0
 for host in "$@"; do
   echo "=== $host ==="
-  ssh -o BatchMode=yes -o ConnectTimeout=15 -T "$host" 'set -e
+  if ! ssh -o BatchMode=yes -o ConnectTimeout=15 -T "$host" 'set -e
 arch=$(uname -m)
 case "$arch" in
   x86_64) os=cli-alpine-x64 ;;
@@ -73,5 +74,9 @@ fi
 install -m 755 "$bin" "$dest/code"
 "$dest/code" --version
 "$dest/code" agent host --help | head -3
-'
+'; then
+    echo "warning: VS Code CLI setup failed on $host; continuing with other hosts" >&2
+    failed=1
+  fi
 done
+exit "$failed"

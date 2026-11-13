@@ -9,7 +9,8 @@
 #   /mnt/user/appdata/filebrowser/settings.json
 services:
   filebrowser:
-    image: gtstef/filebrowser:stable
+    # 2.1.4-beta: fixes 3D preview probing a missing textures/ dir (404 toasts on 2.0.2). Return to :stable once 2.1 ships stable.
+    image: gtstef/filebrowser:2.1.4-beta
     container_name: filebrowser
     hostname: filebrowser
     restart: unless-stopped

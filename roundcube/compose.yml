@@ -1,0 +1,106 @@
+services:
+  roundcube:
+    image: roundcube/roundcubemail:1.7.4-apache-nonroot@sha256:22a0ed6be0d08a30fbe68301e7bb91dfa7811c4a884eb91a75e92076ca0be097
+    container_name: roundcube
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      ROUNDCUBEMAIL_DB_TYPE: sqlite
+      ROUNDCUBEMAIL_DEFAULT_HOST: ssl://outlook.office365.com
+      ROUNDCUBEMAIL_DEFAULT_PORT: "993"
+      ROUNDCUBEMAIL_SMTP_SERVER: tls://smtp-mail.outlook.com
+      ROUNDCUBEMAIL_SMTP_PORT: "587"
+      ROUNDCUBEMAIL_REQUEST_PATH: /
+      ROUNDCUBEMAIL_PLUGINS: private_log_redaction,archive,zipdownload,markasjunk,slate_prefetch
+      ROUNDCUBEMAIL_SKIN: elastic
+      TZ: Europe/Stockholm
+    volumes:
+      - /mnt/cache/appdata/roundcube/db:/var/roundcube/db
+      - /mnt/cache/appdata/roundcube/temp:/tmp/roundcube-temp
+      - /mnt/cache/appdata/roundcube/secrets:/run/secrets:ro
+      - ./config:/var/roundcube/config:ro
+      - ./php.ini:/usr/local/etc/php/conf.d/roundcube-local.ini:ro
+      - ./apache-private.conf:/etc/apache2/sites-enabled/000-default.conf:ro
+      - ./plugins/private_log_redaction:/opt/private_log_redaction:ro
+      - ./install-private-plugin.sh:/entrypoint-tasks/post-setup/10-private-log-redaction.sh:ro
+      - ./skins/slate:/opt/slate:ro
+      - ./install-slate-skin.sh:/entrypoint-tasks/post-setup/20-slate-skin.sh:ro
+      - ./plugins/slate_prefetch:/opt/slate_prefetch:ro
+      - ./install-slate-prefetch.sh:/entrypoint-tasks/post-setup/30-slate-prefetch.sh:ro
+    # No host ports or public Traefik route. Only the private Caddy proxy serves this application.
+    networks:
+      - npm_services
+      - cache
+    depends_on:
+      - roundcube-redis
+    labels:
+      traefik.enable: "false"
+      com.centurylinklabs.watchtower.enable: "false"
+    healthcheck:
+      test:
+        - CMD
+        - php
+        - -r
+        - "$$c=stream_context_create(['http'=>['header'=>['Host: mail.netbird.hjacke.com'],'timeout'=>5,'ignore_errors'=>true,'follow_location'=>0]]); $$b=@file_get_contents('http://127.0.0.1:8000/?_task=login', false, $$c); $$h=$$http_response_header[0]??''; exit($$b!==false && (str_contains($$h,' 302 ') || (str_contains($$h,' 200 ') && str_contains($$b,'Roundcube'))) ? 0 : 1);"
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # IMAP folder/index cache for Roundcube. Memory only, no ports, internal network.
+  roundcube-redis:
+    image: redis:7-alpine@sha256:57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541
+    container_name: roundcube-redis
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "999:1000"
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - 64mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --protected-mode
+      - "no"
+    tmpfs:
+      - /data:size=8m,mode=0700,uid=999,gid=1000
+    networks:
+      - cache
+    labels:
+      traefik.enable: "false"
+      com.centurylinklabs.watchtower.enable: "false"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+networks:
+  npm_services:
+    external: true
+  # Internal only: Roundcube <-> Redis. No gateway, no outside access.
+  cache:
+    internal: true

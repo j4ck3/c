@@ -28,7 +28,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        DSH_VERSION: ${DSH_VERSION:-0.1.6-alpha.2}
+        DSH_VERSION: ${DSH_VERSION:-0.2.1-rc.5}
     image: deepseek-harness:local
     container_name: deepseek-harness
     hostname: deepseek-harness
@@ -53,9 +53,9 @@ services:
       - TRUSTED_HOST=${TRUSTED_HOST:-code.netbird.hjacke.com}
       - DSH_PORT=13080
       - PROXY_PORT=3080
-      # Recreate Unraid's volatile /root Agent Host link from persistent cache
-      # storage before DSH starts. Space-separated targets are supported.
-      - DSH_REMOTE_VSCODE_HOSTS=${DSH_REMOTE_VSCODE_HOSTS:-tower}
+      # Ensure an official private CLI on every SSH target before DSH starts;
+      # also restores Unraid's volatile /root link from persistent cache.
+      - DSH_REMOTE_VSCODE_HOSTS=${DSH_REMOTE_VSCODE_HOSTS:-tower htpc web 10.0.0.165}
       # br0_docker is macvlan: its children cannot reach the parent host at
       # 10.0.0.24. Route only Tower itself through the normal Docker bridge.
       - TOWER_HOST_IP=10.0.0.24
@@ -103,6 +103,12 @@ services:
     working_dir: /workspace
     expose:
       - "3080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS --max-time 2 -o /dev/null http://127.0.0.1:13080/ && curl -fsS --max-time 2 -o /dev/null http://127.0.0.1:8788/readyz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     # Pi-hole is 172.44.0.2 on dns_net. Without a static address here, a
     # restart race lets this container steal .2 and DNS (model API calls) dies.
     dns:
@@ -113,6 +119,65 @@ services:
         ipv4_address: 172.44.0.27
       br0_docker:
         ipv4_address: 10.0.0.27
+
+  # OpenDesign web studio with a private DSH runtime in the same deployment.
+  # Reachable through the Netbird Caddy proxy at https://design.netbird.hjacke.com.
+  open-design:
+    <<: *default
+    build:
+      context: .
+      dockerfile: Dockerfile.open-design
+      args:
+        OPEN_DESIGN_IMAGE: ${OPEN_DESIGN_IMAGE:-ghcr.io/nexu-io/od:0.24.0}
+        OPEN_DESIGN_REF: ${OPEN_DESIGN_REF:-open-design-v0.24.0}
+        DSH_VERSION: ${OPEN_DESIGN_DSH_VERSION:-0.1.7-rc.1}
+    image: open-design:local
+    container_name: open-design
+    hostname: open-design
+    env_file:
+      - path: ../t3code/.env
+        required: false
+    environment:
+      - HOME=/app/.od/home
+      - DSH_HOME=/app/.od/dsh
+      - DSH_BIN=/usr/local/bin/dsh
+      - DSH_PERMISSION_MODE=danger-full-access
+      - OD_BIND_HOST=0.0.0.0
+      - OD_PORT=7456
+      - OD_WEB_PORT=7456
+      - OD_DATA_DIR=/app/.od
+      - OD_ALLOWED_ORIGINS=${OPEN_DESIGN_ALLOWED_ORIGINS:-https://design.netbird.hjacke.com}
+      - OD_API_TOKEN=${OD_API_TOKEN:-}
+      - OD_CODEX_SANDBOX=danger-full-access
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+    expose:
+      - "7456"
+    volumes:
+      - open_design_data:/app/.od
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: ${OPEN_DESIGN_MEM_LIMIT:-1g}
+    pids_limit: 512
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7456/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    dns:
+      - 172.44.0.2
+    networks:
+      npm_services:
+      dns_net:
+        ipv4_address: 172.44.0.28
+
+volumes:
+  open_design_data:
 
 networks:
   npm_services:
